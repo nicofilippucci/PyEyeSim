@@ -22,6 +22,7 @@ class EyeData:
     from ._stats import AngleCalc,AngtoPix,PixdoDeg,Entropy,FixDurProg,BinnedCount,GetInddiff,GetInddiff_v2,RunDiffDivs,GetBinnedStimFixS,StatPDiffInd2,StatPDiffInd1,CalcStatPs,CalcRets,CalcImmRets,BinnedDescriptives
     from ._comparegroups import CompareGroupsFix,CompareWithinGroupsFix,FixDurProgGroups,BinnedDescriptivesGroups,CompareGroupsMat,CompareGroupsGridFix,CompareStimHeatmap,CompareStimGridFix
     from ._scanpathsim import AOIFix,SacSimPipeline,SacSim1Group,SaccadeSel,ScanpathSim2Groups
+    from .hmmanalysis import GaussianHMMPipeline,models_pipeline,calculate_starting_likelihood,likelihood_matrix,plot_pipeline,plot_models_summary,plot_likelihood_matrix,plot_simulated_data,plot_starting_likelihood,calculate_best_model,calculate_entropy,score_calculation,fishers_score_regularized,normalize_scores,best_models,min_max_avg,models_fit,model_def,data_simulation,fixation_sequence,get_data
 
     try: 
         from ._hmm import DataArrayHmm,MyTrainTest,FitLOOHMM,FitVisHMM,FitVisHMMGroups,HMMSimPipeline

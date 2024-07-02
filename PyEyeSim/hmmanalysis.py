@@ -855,7 +855,7 @@ def plot_models_summary(likelihood_matrix, n_components_list, evaluation):
         final_scores = final_scores / len(evaluation)
 
     _, ax = plt.subplots(figsize=(10, 10))
-    create_plot(ax, final_scores, n_components_list, 'Final Scores Matrix', 'Fitted Model', 'Simulated Data', 'score')
+    create_plot(ax, final_scores, n_components_list, 'Final Scores Matrix', 'Simulated Data', 'Fitted Model', 'score')
     # plot a diagonal line from the bottom-left to the top-right
     ax.plot([0, len(n_components_list)-1], [len(n_components_list)-1, 0], color='gray', linestyle='--')
 
