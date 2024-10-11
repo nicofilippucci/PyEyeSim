@@ -212,6 +212,5 @@ def HMMSimPipeline(self,ncomps=[4,6],verb=False):
             else:
                 StimSimsHMMall[cncomp,:,cp]=ScoresLOO
             StimSimsHMM[cncomp,cp]=np.mean(ScoresLOO)
-    return StimSimsHMM, StimSimsHMMall
-
+    return StimSimsHMM, np.nanmean(StimSimsHMMall,0), StimSimsHMMall
 
