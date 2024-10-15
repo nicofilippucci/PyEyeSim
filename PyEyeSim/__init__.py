@@ -79,6 +79,29 @@ class EyeData:
         SaccadeSel,
         ScanpathSim2Groups,
     )
+    from .hmmanalysis import (
+        GaussianHMMPipeline,
+        models_pipeline,
+        calculate_starting_likelihood,
+        likelihood_matrix,
+        plot_pipeline,
+        plot_models_summary,
+        plot_likelihood_matrix,
+        plot_simulated_data,
+        plot_starting_likelihood,
+        calculate_best_model,
+        calculate_entropy,
+        score_calculation,
+        fishers_score_regularized,
+        normalize_scores,
+        best_models,
+        min_max_avg,
+        models_fit,
+        model_def,
+        data_simulation,
+        fixation_sequence,
+        get_data,
+    )
     
     from .similarity import RSA_heatmap_pipeline
 
