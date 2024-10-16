@@ -100,7 +100,7 @@ def get_data(self, stim, group=-1, tolerance=20):
 
     return XX, YY, list_lengths
 
-def fixation_sequence(lengths, method='random', subject=None):
+def fixation_sequence(self, lengths, method='random', subject=None):
     """
     Generates a sequence of fixation lengths.
 
@@ -146,7 +146,7 @@ def fixation_sequence(lengths, method='random', subject=None):
         else:
             raise ValueError('Invalid method. Use "random", "average" or "max".')
 
-def data_simulation(models, lengths):
+def data_simulation(self, models, lengths):
     """
     Simulates data from fitted models.
 
@@ -178,7 +178,7 @@ def data_simulation(models, lengths):
     
     return simulated_data, simulated_X, simulated_Y
 
-def models_fit(X, Y, models, lengths):
+def models_fit(self, X, Y, models, lengths):
     """
     Fits GaussianHMM models with different numbers of components.
 
@@ -210,7 +210,7 @@ def models_fit(X, Y, models, lengths):
         new_models.append(fitted)
     return new_models
 
-def model_def(X, Y, list_lengths, n_components_list, covariance_type='full', n_iter=10):
+def model_def(self, X, Y, list_lengths, n_components_list, covariance_type='full', n_iter=10):
     """
     Fits GaussianHMM models with different numbers of components.
 
@@ -244,11 +244,11 @@ def model_def(X, Y, list_lengths, n_components_list, covariance_type='full', n_i
     models = []
     for n_components in n_components_list:
         models.append(hmm.GaussianHMM(n_components=n_components, covariance_type=covariance_type, n_iter=n_iter))
-    models = models_fit(X, Y, models, list_lengths)
+    models = models_fit(self, X, Y, models, list_lengths)
 
     return models
 
-def fishers_score_regularized(lda, X_train, y_train):
+def fishers_score_regularized(self, lda, X_train, y_train):
     """
     Calculate the Fisher's Linear Discriminant Score.
     Measures the separation between classes in the transformed feature space. 
@@ -307,7 +307,7 @@ def fishers_score_regularized(lda, X_train, y_train):
     fishers_score_regularized = np.trace(np.linalg.inv(within_class_scatter_regularized).dot(between_class_scatter))
     return fishers_score_regularized
 
-def score_calculation(method, model, data, lengths, lda_model=None):
+def score_calculation(self, method, model, data, lengths, lda_model=None):
     """
     Calculate the evaluation score for a model.
 
@@ -341,11 +341,11 @@ def score_calculation(method, model, data, lengths, lda_model=None):
         case 'aic':
             return model.aic(data, lengths) / data.shape[0]
         case 'lda':
-            return fishers_score_regularized(lda_model, data, model.predict(data, lengths))
+            return fishers_score_regularized(self, lda_model, data, model.predict(data, lengths))
         case _:
             raise ValueError('Invalid method. Use "score", "bic", "aic" or "lda".')
 
-def calculate_starting_likelihood(X, Y, list_lengths, n_components_list, covariance_type, n_iter, starting_tests=1, only_bic=False):
+def calculate_starting_likelihood(self, X, Y, list_lengths, n_components_list, covariance_type, n_iter, starting_tests=1, only_bic=False):
     """
     Calculate the likelihood scores for the models with different numbers of components.
     The models are fitted with the real data and the likelihood scores are calculated.
@@ -402,13 +402,13 @@ def calculate_starting_likelihood(X, Y, list_lengths, n_components_list, covaria
     best_score = []
     for _ in range(starting_tests):
         # We create every time new models (at the end we will use the last models for the simulation and fitting process)
-        models = model_def(X, Y, list_lengths, n_components_list, covariance_type, n_iter)
-        bic_scores = [score_calculation('bic', model, np.column_stack((X,Y)), list_lengths) for model in models]
+        models = model_def(self, X, Y, list_lengths, n_components_list, covariance_type, n_iter)
+        bic_scores = [score_calculation(self, 'bic', model, np.column_stack((X,Y)), list_lengths) for model in models]
         bic_scores_all.append(bic_scores)
         if not only_bic:
-            log_likelihood_scores = [score_calculation('score', model, np.column_stack((X,Y)), list_lengths) for model in models]
+            log_likelihood_scores = [score_calculation(self, 'score', model, np.column_stack((X,Y)), list_lengths) for model in models]
             log_likelihood_scores_all.append(log_likelihood_scores)
-            aic_scores = [score_calculation('aic', model, np.column_stack((X,Y)), list_lengths) for model in models]
+            aic_scores = [score_calculation(self, 'aic', model, np.column_stack((X,Y)), list_lengths) for model in models]
             aic_scores_all.append(aic_scores)
 
         if new_models == []:
@@ -431,7 +431,7 @@ def calculate_starting_likelihood(X, Y, list_lengths, n_components_list, covaria
     
     return new_models, log_likelihood_scores_all, bic_scores_all, aic_scores_all
 
-def min_max_avg(total):
+def min_max_avg(self, total):
     """
     Calculate the minimum, maximum, and average values for each point in the likelihood matrix.
     
@@ -457,7 +457,7 @@ def min_max_avg(total):
 
     return _min, _max, _mean
 
-def normalize_scores(scores):
+def normalize_scores(self, scores):
     """
     Simple min-max normalization of the likelihood matrix.
 
@@ -475,7 +475,7 @@ def normalize_scores(scores):
     """
     return (scores - scores.min()) / (scores.max() - scores.min())
 
-def best_models(n_components_list, score, threshold):
+def best_models(self, n_components_list, score, threshold):
     """
     Select the top models based on the threshold.
 
@@ -504,7 +504,7 @@ def best_models(n_components_list, score, threshold):
 
     return n_components_list_ranked
 
-def calculate_best_model(n_components_list, bic_scores_all, threshold):
+def calculate_best_model(self, n_components_list, bic_scores_all, threshold):
     """
     Calculate the best models based on the mean and standard deviation of the BIC scores.
 
@@ -536,18 +536,18 @@ def calculate_best_model(n_components_list, bic_scores_all, threshold):
     if threshold < 0 or threshold > 1:
         raise ValueError('Invalid threshold. Must be between 0 and 1.')
 
-    min_bic, _, mean_bic = min_max_avg(bic_scores_all)
+    min_bic, _, mean_bic = min_max_avg(self, bic_scores_all)
     standard_deviation = np.std(bic_scores_all, axis=0)
     
     # Normalize the scores
-    min_bic = normalize_scores(min_bic)
-    mean_bic = normalize_scores(mean_bic)
-    standard_deviation = normalize_scores(standard_deviation)
+    min_bic = normalize_scores(self, min_bic)
+    mean_bic = normalize_scores(self, mean_bic)
+    standard_deviation = normalize_scores(self, standard_deviation)
     std_score = (mean_bic + standard_deviation) / 2
     
     # Identify best models
-    best_model_by_bic = best_models(n_components_list, min_bic, threshold)
-    n_components_list_ranked = best_models(n_components_list, std_score, threshold)
+    best_model_by_bic = best_models(self, n_components_list, min_bic, threshold)
+    n_components_list_ranked = best_models(self, n_components_list, std_score, threshold)
 
     return n_components_list_ranked, best_model_by_bic
 
@@ -572,7 +572,7 @@ def calculate_entropy(self, stim):
 
     return entropy
 
-def likelihood_matrix(models, simulated_data, lengths, n_components_list, evaluation='score', lda_models=None):
+def likelihood_matrix(self, models, simulated_data, lengths, n_components_list, evaluation='score', lda_models=None):
     """
     Creates a likelihood matrix based on the specified criteria.
 
@@ -615,7 +615,7 @@ def likelihood_matrix(models, simulated_data, lengths, n_components_list, evalua
                 for j, model in enumerate(models):
                     if lda_models is not None:
                         lda = lda_models[j]
-                    likelihood_mat[j, i] = score_calculation(evaluation, model, simulated_data[i], lengths, lda_model=lda)
+                    likelihood_mat[j, i] = score_calculation(self, evaluation, model, simulated_data[i], lengths, lda_model=lda)
             return likelihood_mat
         
     likelihood_mat = np.zeros((len(evaluation), len(n_components_list), len(n_components_list)))
@@ -625,12 +625,12 @@ def likelihood_matrix(models, simulated_data, lengths, n_components_list, evalua
                 if e in methods:
                     if lda_models is not None:
                         lda = lda_models[j]
-                    likelihood_mat[k][j, i] = score_calculation(e, model, simulated_data[i], lengths, lda_model=lda)
+                    likelihood_mat[k][j, i] = score_calculation(self, e, model, simulated_data[i], lengths, lda_model=lda)
                 else:
                     raise ValueError('Invalid criteria. Use "score", "bic", "aic", "lda" or "all".')
     return likelihood_mat
 
-def create_plot(ax, matrix, ticks, title, xlabel, ylabel, method):
+def create_plot(self, ax, matrix, ticks, title, xlabel, ylabel, method):
     """
     Create a plot for the likelihood matrix.
 
@@ -674,7 +674,7 @@ def create_plot(ax, matrix, ticks, title, xlabel, ylabel, method):
     ax.set_ylabel(ylabel)
     ax.set_title(title)
 
-def plot_starting_likelihood(n_components_list, bic_scores_all, log_likelihood_scores_all=None, aic_scores_all=None):
+def plot_starting_likelihood(self, n_components_list, bic_scores_all, log_likelihood_scores_all=None, aic_scores_all=None):
     """
     Plot the starting likelihood scores.
 
@@ -705,8 +705,8 @@ def plot_starting_likelihood(n_components_list, bic_scores_all, log_likelihood_s
         plt.xlabel('Number of Components')
         plt.ylabel('Score')
     else:
-        log_likelihood_min, log_likelihood_max, log_likelihood_mean = min_max_avg(log_likelihood_scores_all)
-        aic_min, aic_max, aic_mean = min_max_avg(aic_scores_all)
+        log_likelihood_min, log_likelihood_max, log_likelihood_mean = min_max_avg(self, log_likelihood_scores_all)
+        aic_min, aic_max, aic_mean = min_max_avg(self, aic_scores_all)
 
         # Plot BIC and AIC as boxplots
         plt.plot(n_components_list, bic_mean, color='blue', marker='o', label='BIC Mean')
@@ -738,7 +738,7 @@ def plot_starting_likelihood(n_components_list, bic_scores_all, log_likelihood_s
     plt.show()
 
 
-def plot_comparison_likelihood(n_components_list, scores, labels=None):
+def plot_comparison_likelihood(self, n_components_list, scores, labels=None):
     """
     Plot the comparison of likelihood scores for multiple sets of results.
 
@@ -762,13 +762,13 @@ def plot_comparison_likelihood(n_components_list, scores, labels=None):
         
         # Plot BIC scores
         if bic_scores_all is not None:
-            bic_min, bic_max, bic_mean = min_max_avg(bic_scores_all)
+            bic_min, bic_max, bic_mean = min_max_avg(self, bic_scores_all)
             plt.plot(n_components_list, bic_mean, marker='o', label=f'BIC Group {labels[idx]}' if labels else f'BIC Group {idx+1}')
             plt.fill_between(n_components_list, bic_min, bic_max, alpha=0.3)
 
         # Plot AIC scores
         if aic_scores_all is not None:
-            aic_min, aic_max, aic_mean = min_max_avg(aic_scores_all)
+            aic_min, aic_max, aic_mean = min_max_avg(self, aic_scores_all)
             plt.plot(n_components_list, aic_mean, marker='o', label=f'AIC Group {labels[idx]}' if labels else f'AIC Group {idx+1}')
             plt.fill_between(n_components_list, aic_min, aic_max, alpha=0.3)
 
@@ -778,7 +778,7 @@ def plot_comparison_likelihood(n_components_list, scores, labels=None):
         for idx, score_set in enumerate(scores):
             log_likelihood_scores_all, _, _ = score_set
             if log_likelihood_scores_all is not None:
-                log_likelihood_min, log_likelihood_max, log_likelihood_mean = min_max_avg(log_likelihood_scores_all)
+                log_likelihood_min, log_likelihood_max, log_likelihood_mean = min_max_avg(self, log_likelihood_scores_all)
                 ax2.plot(n_components_list, log_likelihood_mean, color='orange', marker='o', label=f'Log Likelihood Group {labels[idx]}' if labels else f'Log Likelihood Group {idx+1}')
                 ax2.fill_between(n_components_list, log_likelihood_min, log_likelihood_max, color='orange', alpha=0.3)
 
@@ -804,7 +804,7 @@ def plot_comparison_likelihood(n_components_list, scores, labels=None):
     plt.show()
 
 
-def plot_likelihood_matrix(likelihood_matrix, n_components_list, iteration, evaluation='score'):
+def plot_likelihood_matrix(self, likelihood_matrix, n_components_list, iteration, evaluation='score'):
     """
     Plot the likelihood matrix.
 
@@ -827,7 +827,7 @@ def plot_likelihood_matrix(likelihood_matrix, n_components_list, iteration, eval
             evaluation = ['score', 'bic', 'aic', 'lda']
         else:
             fig, ax = plt.subplots(figsize=(10, 10))
-            create_plot(ax, likelihood_matrix, n_components_list, 'Likelihood Matrix ({})'.format(evaluation), 'Simulated data', 'Fitted model', evaluation)
+            create_plot(self, ax, likelihood_matrix, n_components_list, 'Likelihood Matrix ({})'.format(evaluation), 'Simulated data', 'Fitted model', evaluation)
             plt.show()
             return
         
@@ -837,7 +837,7 @@ def plot_likelihood_matrix(likelihood_matrix, n_components_list, iteration, eval
     fig.suptitle('Likelihood Matrix after {} iterations'.format(iteration), fontsize=16)
     for i, method in enumerate(evaluation):
         ax = axs.flat[i]
-        create_plot(ax, likelihood_matrix[i], n_components_list, 'Likelihood Matrix ({})'.format(method), 'Simulated data', 'Fitted model', method)
+        create_plot(self, ax, likelihood_matrix[i], n_components_list, 'Likelihood Matrix ({})'.format(method), 'Simulated data', 'Fitted model', method)
     if num_methods % 2 != 0:
         fig.delaxes(axs.flat[-1])
     plt.show()
@@ -878,7 +878,7 @@ def plot_simulated_data(self, stim, models, simulated_X, simulated_Y, n_componen
         ax[i+1].set_title('Number of components: {}'.format(n_components))
     plt.show()
 
-def plot_models_summary(likelihood_matrix, n_components_list, evaluation):
+def plot_models_summary(self, likelihood_matrix, n_components_list, evaluation):
     """
     Plot a summary of all the models based on the likelihood matrix and different evaluation criteria.
     For each model, the diagonal value is checked and if is well separable the best result is highlighted in red.
@@ -900,7 +900,7 @@ def plot_models_summary(likelihood_matrix, n_components_list, evaluation):
         if evaluation == 'all':
             for index, lm in enumerate(likelihood_matrix):
                 # normalize the likelihood matrix
-                lm = normalize_scores(lm)
+                lm = normalize_scores(self, lm)
                 # add the normalized likelihood matrix to the final scores
                 if index == 1 or index == 3:
                     final_scores += lm
@@ -913,7 +913,7 @@ def plot_models_summary(likelihood_matrix, n_components_list, evaluation):
         for index, ev in enumerate(evaluation):
             lm = likelihood_matrix[index]
             # normalize the likelihood matrix
-            lm = normalize_scores(lm)
+            lm = normalize_scores(self, lm)
             # add the normalized likelihood matrix to the final scores
             if ev == 'score' or ev == 'lda':
                 final_scores += lm
@@ -922,7 +922,7 @@ def plot_models_summary(likelihood_matrix, n_components_list, evaluation):
         final_scores = final_scores / len(evaluation)
 
     _, ax = plt.subplots(figsize=(10, 10))
-    create_plot(ax, final_scores, n_components_list, 'Final Scores Matrix', 'Simulated Data', 'Fitted Model', 'score')
+    create_plot(self, ax, final_scores, n_components_list, 'Final Scores Matrix', 'Simulated Data', 'Fitted Model', 'score')
     # plot a diagonal line from the bottom-left to the top-right
     ax.plot([0, len(n_components_list)-1], [len(n_components_list)-1, 0], color='gray', linestyle='--')
 
@@ -982,10 +982,10 @@ def plot_pipeline(self, models, stimuli, iteration, simulated_X, simulated_Y, n_
         - If `False` the complete likelihood matrix is plotted.
     """
     if not Summary:
-        plot_likelihood_matrix(likelihood_mat, n_components_list, iteration, evaluation)
+        plot_likelihood_matrix(self, likelihood_mat, n_components_list, iteration, evaluation)
     plot_simulated_data(self, stimuli, models, simulated_X, simulated_Y, n_components_list, new_list_len)
     if evaluation == 'all' or isinstance(evaluation, list):
-        plot_models_summary(likelihood_mat, n_components_list, evaluation)
+        plot_models_summary(self, likelihood_mat, n_components_list, evaluation)
 
 def models_pipeline(self, stim, n_components_list, group=-1, iteration=1, tollerance=20, simulation_type='random', evaluation='all', covariance_type='full', n_iter=10, starting_tests=1, only_starting=False, only_bic=False, only_best=False, threshold=0.5, models=None, subject=None):
     """
@@ -1074,16 +1074,16 @@ def models_pipeline(self, stim, n_components_list, group=-1, iteration=1, toller
         
         if models is None:
             # Calculate the likelihood scores for the models
-            models, log_likelihood_scores_all, bic_scores_all, aic_scores_all = calculate_starting_likelihood(X, Y, list_lengths, n_components_list, covariance_type, n_iter, starting_tests, only_bic)
+            models, log_likelihood_scores_all, bic_scores_all, aic_scores_all = calculate_starting_likelihood(self, X, Y, list_lengths, n_components_list, covariance_type, n_iter, starting_tests, only_bic)
             # Send the results to the plot function
             if len(group) == 1:
-                plot_starting_likelihood(n_components_list, bic_scores_all, log_likelihood_scores_all, aic_scores_all)
+                plot_starting_likelihood(self, n_components_list, bic_scores_all, log_likelihood_scores_all, aic_scores_all)
             if len(group) > 1:
                 scores.append([log_likelihood_scores_all, bic_scores_all, aic_scores_all])
 
             results = None
             if only_best:
-                n_components_list, best_bic = calculate_best_model(n_components_list, bic_scores_all, threshold)
+                n_components_list, best_bic = calculate_best_model(self, n_components_list, bic_scores_all, threshold)
                 entropy = calculate_entropy(self, stim)
                 # create a dataframe with the results
                 results = pd.DataFrame({
@@ -1123,39 +1123,39 @@ def models_pipeline(self, stim, n_components_list, group=-1, iteration=1, toller
                 lda.fit(data, y_train)
                 lda_models.append(lda)
 
-        list_len =  fixation_sequence(list_lengths, simulation_type, subject)
+        list_len =  fixation_sequence(self, list_lengths, simulation_type, subject)
         # Simulate data from the models
-        simulated_data, simulated_X, simulated_Y = data_simulation(models, list_len)
+        simulated_data, simulated_X, simulated_Y = data_simulation(self, models, list_len)
 
         if iteration > 1:
             new_models = models
             sd, sx, sy = simulated_data, simulated_X, simulated_Y
             new_list_len = list_len
             # Evaluate the models and repete the simulation and fitting process for the specified number of iterations
-            likelihood_mat = likelihood_matrix(new_models, sd, new_list_len, n_components_list, evaluation, lda_models=lda_models)
+            likelihood_mat = likelihood_matrix(self, new_models, sd, new_list_len, n_components_list, evaluation, lda_models=lda_models)
             for _ in range(iteration-1):
                 # The fit function is printing that the parameters ‘s’ for startprob, ‘t’ for transmat, ‘m’ for means, and ‘c’ for covars 
                 # are changing, we do not want to see this
                 with io.capture_output() as _:
-                    new_models = models_fit(np.array(sx), np.array(sy), new_models, new_list_len)
+                    new_models = models_fit(self, np.array(sx), np.array(sy), new_models, new_list_len)
                 # Simulate data from the models (fitted with real data)
-                new_list_len = fixation_sequence(list_lengths, simulation_type, subject)
-                sd, sx, sy = data_simulation(models, new_list_len) 
-                likelihood_mat += likelihood_matrix(new_models, sd, new_list_len, n_components_list, evaluation, lda_models=lda_models)
+                new_list_len = fixation_sequence(self, list_lengths, simulation_type, subject)
+                sd, sx, sy = data_simulation(self, models, new_list_len) 
+                likelihood_mat += likelihood_matrix(self, new_models, sd, new_list_len, n_components_list, evaluation, lda_models=lda_models)
             models = new_models
             simulated_X = sx
             simulated_Y = sy
             list_len = new_list_len
         else:
             # Evaluate the models
-            likelihood_mat = likelihood_matrix(models, simulated_data, list_len, n_components_list, evaluation, lda_models=lda_models)
+            likelihood_mat = likelihood_matrix(self, models, simulated_data, list_len, n_components_list, evaluation, lda_models=lda_models)
         
         list_results.append([models, simulated_X, simulated_Y, list_len, likelihood_mat, n_components_list])
         models, simulated_X, simulated_Y, list_len, likelihood_mat = None, None, None, None, None
         n_components_list = original_components
 
     if len(group) > 1:
-        plot_comparison_likelihood(n_components_list, scores, labels = group)
+        plot_comparison_likelihood(self, n_components_list, scores, labels = group)
 
     return list_results
 
