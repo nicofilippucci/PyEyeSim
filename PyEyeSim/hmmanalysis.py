@@ -70,6 +70,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 import hmmlearn.hmm  as hmm
 from IPython.utils import io
+import copy
 
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
@@ -987,7 +988,7 @@ def plot_pipeline(self, models, stimuli, iteration, simulated_X, simulated_Y, n_
     if evaluation == 'all' or isinstance(evaluation, list):
         plot_models_summary(self, likelihood_mat, n_components_list, evaluation)
 
-def models_pipeline(self, stim, n_components_list, group=-1, iteration=1, tollerance=20, simulation_type='random', evaluation='all', covariance_type='full', n_iter=10, starting_tests=1, only_starting=False, only_bic=False, only_best=False, threshold=0.5, models=None, subject=None):
+def models_pipeline(self, stim, n_components_list, group=-1, iteration=1, tollerance=20, simulation_type='random', evaluation='all', covariance_type='full', n_iter=10, starting_tests=1, only_starting=False, only_bic=False, only_best=False, threshold=0.5, list_models=None, subject=None):
     """
     Initializes the GaussianHMM models and simulates data for the specified stimulus, then fits the models and evaluates them.
     Repeat the simulation and fitting process for the specified number of iterations.
@@ -1036,7 +1037,7 @@ def models_pipeline(self, stim, n_components_list, group=-1, iteration=1, toller
     threshold : float
         The threshold to select the top models.
 
-    models : list
+    list_models : list
         List of GaussianHMM models to fit.
         Can be used to start the pipeline from a specfic set of pre-fitted models.
 
@@ -1058,6 +1059,9 @@ def models_pipeline(self, stim, n_components_list, group=-1, iteration=1, toller
         List of number of components for each model
     """
 
+    if list_models is not None:
+        models = copy.deepcopy(list_models)
+
     list_results = []
     scores = []
 
@@ -1072,7 +1076,7 @@ def models_pipeline(self, stim, n_components_list, group=-1, iteration=1, toller
         if starting_tests < 1:
             raise ValueError('Invalid number of starting tests. Must be greater or equal to 1.')
         
-        if models is None:
+        if list_models is None:
             # Calculate the likelihood scores for the models
             models, log_likelihood_scores_all, bic_scores_all, aic_scores_all = calculate_starting_likelihood(self, X, Y, list_lengths, n_components_list, covariance_type, n_iter, starting_tests, only_bic)
             # Send the results to the plot function
@@ -1128,7 +1132,7 @@ def models_pipeline(self, stim, n_components_list, group=-1, iteration=1, toller
         simulated_data, simulated_X, simulated_Y = data_simulation(self, models, list_len)
 
         if iteration > 1:
-            new_models = models
+            new_models = copy.deepcopy(models)
             sd, sx, sy = simulated_data, simulated_X, simulated_Y
             new_list_len = list_len
             # Evaluate the models and repete the simulation and fitting process for the specified number of iterations
