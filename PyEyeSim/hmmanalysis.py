@@ -694,7 +694,7 @@ def plot_starting_likelihood(self, n_components_list, bic_scores_all, log_likeli
         The AIC scores for each model.
     """
     # Calculate mean, max, and min for each point in n_components_list
-    bic_min, bic_max, bic_mean = min_max_avg(bic_scores_all)
+    bic_min, bic_max, bic_mean = min_max_avg(self, bic_scores_all)
 
     # Plotting
     plt.figure(figsize=(10, 6))
@@ -985,8 +985,10 @@ def plot_pipeline(self, models, stimuli, iteration, simulated_X, simulated_Y, n_
     if not Summary:
         plot_likelihood_matrix(self, likelihood_mat, n_components_list, iteration, evaluation)
     plot_simulated_data(self, stimuli, models, simulated_X, simulated_Y, n_components_list, new_list_len)
-    if evaluation == 'all' or isinstance(evaluation, list):
-        plot_models_summary(self, likelihood_mat, n_components_list, evaluation)
+    if len(n_components_list) > 1:
+            if evaluation == 'all' or isinstance(evaluation, list):
+                plot_models_summary(self, likelihood_mat, n_components_list, evaluation)
+
 
 def models_pipeline(self, stim, n_components_list, group=-1, iteration=1, tollerance=20, simulation_type='random', evaluation='all', covariance_type='full', n_iter=10, starting_tests=1, only_starting=False, only_bic=False, only_best=False, threshold=0.5, list_models=None, subject=None):
     """
@@ -1061,6 +1063,8 @@ def models_pipeline(self, stim, n_components_list, group=-1, iteration=1, toller
 
     if list_models is not None:
         models = copy.deepcopy(list_models)
+    else:
+        models = None
 
     list_results = []
     scores = []
@@ -1076,7 +1080,7 @@ def models_pipeline(self, stim, n_components_list, group=-1, iteration=1, toller
         if starting_tests < 1:
             raise ValueError('Invalid number of starting tests. Must be greater or equal to 1.')
         
-        if list_models is None:
+        if models is None:
             # Calculate the likelihood scores for the models
             models, log_likelihood_scores_all, bic_scores_all, aic_scores_all = calculate_starting_likelihood(self, X, Y, list_lengths, n_components_list, covariance_type, n_iter, starting_tests, only_bic)
             # Send the results to the plot function
@@ -1163,7 +1167,7 @@ def models_pipeline(self, stim, n_components_list, group=-1, iteration=1, toller
 
     return list_results
 
-def GaussianHMMPipeline(self, stim, n_components_list, group=-1, iteration=1, tollerance=20, simulation_type='random', evaluation='all', covariance_type='full', n_iter=10, Summary=True, starting_tests=1, only_starting=False, only_bic=False, only_best=False, threshold=0.5, models=None, subject=None):
+def GaussianHMMPipeline(self, stim, n_components_list, group=-1, iteration=1, tollerance=20, simulation_type='random', evaluation='all', covariance_type='full', n_iter=10, Summary=True, starting_tests=1, only_starting=False, only_bic=False, only_best=False, threshold=0.5, list_models=None, subject=None):
     """
     Pipeline for helping the user in create, fit and evaluate GaussianHMM models with different numbers of components.
     
@@ -1239,23 +1243,28 @@ def GaussianHMMPipeline(self, stim, n_components_list, group=-1, iteration=1, to
         >>> stimuli = (Data.stimuli).tolist()
         >>> GaussianHMMPipeline(stimuli, [2, 3, 5, 7])
     """
+    if list_models is not None:
+        models = copy.deepcopy(list_models)
+    else:
+        models = None
+
     if iteration < 1:
         raise ValueError('Invalid number of iterations. Must be greater or equal to 1.')
 
     if isinstance(evaluation, list) and len(evaluation) == 1:
         evaluation = evaluation[0]
 
-    if isinstance(g, int):
+    if isinstance(group, int):
         group = [group]
 
     for g in group:
-        if isinstance(stim, int): 
+        if isinstance(stim, int) or isinstance(stim, float): 
             try:
                 result = models_pipeline(self, stim, n_components_list, g, iteration, tollerance, simulation_type, evaluation, covariance_type, n_iter, starting_tests, only_starting, only_bic, only_best, threshold, models, subject)
                 if only_starting:
                     return result
                 else:
-                    models, simulated_X, simulated_Y, new_list_len, likelihood_mat, n_components_list = result
+                    models, simulated_X, simulated_Y, new_list_len, likelihood_mat, n_components_list = result[0]
             except Exception as e:
                 print("Stimulus: {} - Error: {}".format(stim, e))
                 print('Check the parameters and try again.')
@@ -1272,7 +1281,7 @@ def GaussianHMMPipeline(self, stim, n_components_list, group=-1, iteration=1, to
                         results.append(result)
                         continue
                     else:
-                        models, simulated_X, simulated_Y, new_list_len, likelihood_mat, new_components_list = result
+                        models, simulated_X, simulated_Y, new_list_len, likelihood_mat, new_components_list = result[0]
                 except Exception as e:
                     print("Stimulus: {} - Error: {}".format(stim, e))
                     print('Check the parameters and try again.')
