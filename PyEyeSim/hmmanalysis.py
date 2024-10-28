@@ -74,7 +74,7 @@ import copy
 
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
-def get_data(self, stim, group=-1, tolerance=20):
+def get_data(self, stim, group=-1, tolerance=20, subject=-1, remove_subj=False):
     """
     Get the fixation data for a specific stimulus.
 
@@ -98,6 +98,32 @@ def get_data(self, stim, group=-1, tolerance=20):
     """
     
     XX, YY, list_lengths = self.DataArrayHmm(stim, group, tolerance=tolerance, verb=False)
+
+    if subject != -1:
+        if remove_subj:
+            try:
+                lengths_sum = np.cumsum(list_lengths)
+                if subject == 0:
+                    XX = XX[list_lengths[0]:]
+                    YY = YY[list_lengths[0]:]
+                else:
+                    XX = np.concatenate([XX[:lengths_sum[subject-1]], XX[lengths_sum[subject]:]])
+                    YY = np.concatenate([YY[:lengths_sum[subject-1]], YY[lengths_sum[subject]:]])
+                list_lengths = np.concatenate([list_lengths[:subject], list_lengths[subject+1:]])
+            except Exception as e:
+                raise ValueError(f"Subject {subject} not found in the data.")
+        else:
+            try:
+                lengths_sum = np.cumsum(list_lengths)
+                list_lengths = list_lengths[subject]
+                if subject == 0:
+                    XX = XX[:list_lengths]
+                    YY = YY[:list_lengths]
+                else:
+                    XX = XX[lengths_sum[subject-1]:lengths_sum[subject]]
+                    YY = YY[lengths_sum[subject-1]:lengths_sum[subject]]
+            except Exception as e:
+                raise ValueError(f"Subject {subject} not found in the data.")
 
     return XX, YY, list_lengths
 
@@ -990,7 +1016,7 @@ def plot_pipeline(self, models, stimuli, iteration, simulated_X, simulated_Y, n_
                 plot_models_summary(self, likelihood_mat, n_components_list, evaluation)
 
 
-def models_pipeline(self, stim, n_components_list, group=-1, iteration=1, tollerance=20, simulation_type='random', evaluation='all', covariance_type='full', n_iter=10, starting_tests=1, only_starting=False, only_bic=False, only_best=False, threshold=0.5, list_models=None, subject=None):
+def models_pipeline(self, stim, n_components_list, group=-1, select_subj=-1, remove_subj=False, group_subj=-1, iteration=1, tollerance=20, simulation_type='random', evaluation='all', covariance_type='full', n_iter=10, starting_tests=1, only_starting=False, only_bic=False, only_best=False, threshold=0.5, list_models=None, subject=None):
     """
     Initializes the GaussianHMM models and simulates data for the specified stimulus, then fits the models and evaluates them.
     Repeat the simulation and fitting process for the specified number of iterations.
@@ -1075,7 +1101,13 @@ def models_pipeline(self, stim, n_components_list, group=-1, iteration=1, toller
     original_components = n_components_list
 
     for g in group:
-        X, Y, list_lengths = get_data(self, stim, g, tollerance)
+        if group_subj != -1:
+            if g == group_subj:
+                X, Y, list_lengths = get_data(self, stim, g, tollerance, select_subj, remove_subj)
+            else:
+                X, Y, list_lengths = get_data(self, stim, g, tollerance)
+        else:
+            X, Y, list_lengths = get_data(self, stim, g, tollerance, select_subj, remove_subj)
 
         if starting_tests < 1:
             raise ValueError('Invalid number of starting tests. Must be greater or equal to 1.')

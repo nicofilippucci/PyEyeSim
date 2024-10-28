@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 from .hmmhelper import DiffCompsHMM,FitScoreHMMGauss
 from .visualhelper import draw_ellipse
 import hmmlearn.hmm  as hmm
+from scipy.spatial.distance import cdist
+from IPython.utils import io
  # hmm related functions start here
 def DataArrayHmm(self,stim,group=-1,tolerance=20,verb=True):
     ''' HMM data arrangement, for the format required by hmmlearn
@@ -230,3 +232,229 @@ def HMMSimPipeline(self,ncomps=[4,6],verb=False,covar='full'):
     return StimSimsHMM,np.nanmean(StimSimsHMMall,0), StimSimsHMMall
 
 
+def HMMSimPipelineAll2All(self,ncomp=4,verb=False,covar='full',ntest=3, n_iter=100, iter=1, stimuli=None):
+    ''' all2all across compariosn evaluation of hidden markov model to data,
+    with different number of components, each participants likelihood with leave-one-out cross validation
+    can have a long run time with longer viewing time/lot of data 
+    
+    return the individual loo log likelihoods from the best model (highest log likelihood) for each stimulus 
+    verb=True: print line for subjects with not enough fixations. - too much printing for many subjects wiht low number of fixations 
+    ncomp: list of integers with the number of components to fit 
+    covar: HMM gaussian covariance type , must be one of 'full','tied','spherical' ,'diag'
+    '''
+    if stimuli is None:
+        StimSimsHMMTrain=np.zeros((self.np,self.np))
+        StimSimsHMMTest=np.zeros((self.np,self.np))
+        stimuli=self.stimuli       
+    else:
+        StimSimsHMMTrain=np.zeros((len(stimuli),len(stimuli)))
+        StimSimsHMMTest=np.zeros((len(stimuli),len(stimuli)))
+
+    DatsTrain={}
+    DatsTest={}
+    DatsTrainL={}
+    DatsTestL={}
+    
+    for cp,stim in enumerate(stimuli):
+        xx,yy,lengths=self.DataArrayHmm(stim,tolerance=80,verb=verb)
+        Dat=np.column_stack((xx,yy))
+        DatTr,DatTest,lenTrain,lenTest=self.MyTrainTest(Dat,lengths,ntest=ntest,vis=0,rand=0)
+        DatsTrain[stim]=DatTr
+        DatsTrainL[stim]=lenTrain
+        DatsTest[stim]=DatTest
+        DatsTestL[stim]=lenTest
+        
+    for cp1,stim1 in enumerate(stimuli):
+        HMMfitted,sctr,scte=FitScoreHMMGauss(ncomp,DatsTrain[stim1],DatsTest[stim1], DatsTrainL[stim1],DatsTestL[stim1],covar=covar, n_iter=n_iter, iter=iter)
+        for cp2,stim2 in enumerate(stimuli):
+            StimSimsHMMTrain[cp2,cp1]=HMMfitted.score(DatsTrain[stim2],DatsTrainL[stim2])/np.sum(DatsTrainL[stim2])
+            StimSimsHMMTest[cp2,cp1]=HMMfitted.score(DatsTest[stim2],DatsTestL[stim2])/np.sum(DatsTestL[stim2])
+    
+    self.VisSimmat(StimSimsHMMTrain,'Train', stimuli)
+    self.VisSimmat(StimSimsHMMTest,'Test', stimuli)
+    
+    return StimSimsHMMTrain,StimSimsHMMTest
+
+
+def norm_diff(matrix1, matrix2):
+    """
+    Computes the normalized norm of the difference between two matrices, ensuring the score is between 0 and 1.
+    
+    Parameters:
+    matrix1, matrix2: The matrices to compare.
+    
+    Returns:
+    float: The normalized norm of the difference.
+    """
+    diff_norm = np.linalg.norm(matrix1 - matrix2)
+    normalization_factor = np.linalg.norm(matrix1) + np.linalg.norm(matrix2)
+    
+    if normalization_factor == 0:
+        return 0
+    
+    return diff_norm / normalization_factor
+
+def euclidean_distance(v1, v2):
+    """
+    Computes the Euclidean distance between two 2D vectors.
+    
+    Parameters:
+    v1, v2: The vectors to compare.
+    
+    Returns:
+    float: The Euclidean distance.
+    """
+    return np.linalg.norm(v1 - v2)
+
+def covariance_shape_and_orientation_diff(cov1, cov2):
+    """
+    Computes a normalized score that represents the difference in shape and orientation
+    between two covariance matrices (2x2), ensuring the score is between 0 and 1.
+    
+    Parameters:
+    cov1, cov2: The 2x2 covariance matrices to compare.
+    
+    Returns:
+    float: A normalized score representing the difference between the shapes and orientations of the ellipses.
+    """
+    # If covariances are identical, return 0
+    if np.allclose(cov1, cov2):
+        return 0 
+
+    # Get the eigenvalues and eigenvectors (shape and orientation) for each covariance matrix
+    eigvals1, eigvecs1 = np.linalg.eigh(cov1)
+    eigvals2, eigvecs2 = np.linalg.eigh(cov2)
+    
+    # 1. Shape difference: Compare the eigenvalues (semi-axes lengths of the ellipses)
+    # Normalize by the sum of the eigenvalues
+    shape_diff = np.abs(eigvals1 - eigvals2) / (np.abs(eigvals1) + np.abs(eigvals2))
+    shape_score = np.sum(shape_diff)  # Aggregate the normalized differences
+    
+    # 2. Orientation difference: Compare the eigenvectors (directions of the semi-axes)
+    # Compute the cosine of the angle between the two corresponding eigenvectors
+    orientation_diff = np.abs(np.dot(eigvecs1[:, 0], eigvecs2[:, 0]))  # Cosine of the angle between principal axes
+    orientation_score = 1 - orientation_diff  # Normalize to be in range [0, 1]
+    
+    # Combine shape and orientation scores
+    total_score = (shape_score + orientation_score) / (shape_score + orientation_score + 1)
+    
+    return total_score
+
+def reorder_model_states(model1, model2):
+    """
+    Reorders the states of model2 to best match the states of model1 based on the means.
+    
+    Parameters:
+    model1, model2: The HMM models to reorder and compare.
+    
+    Returns:
+    reordered_model2: model2 with reordered states to match model1.
+    """
+
+    # Step 1: Find the best correspondence between states by comparing the means
+    mean_distances = cdist(model1.means_, model2.means_, metric='euclidean')
+    best_match = np.argmin(mean_distances, axis=1)
+    
+    # Reorder means
+    model2.means_ = model2.means_[best_match]
+    
+    # Reorder covariances
+    model2.covars_ = model2.covars_[best_match]
+
+
+def compare_hmm_models_with_scores(hmm_models):
+    """
+    Compares the key matrices (transition matrix, means, covariances) of a list of GaussianHMM models,
+    and adds a score indicating the similarity of the matrices.
+    
+    Parameters:
+    hmm_models (list): A list of GaussianHMM models to compare.
+    
+    Returns:
+    dict: A dictionary containing the pairwise differences and similarity scores for each matrix type.
+    """
+    n_models = len(hmm_models)
+    results = {
+        'transition_diff': [],
+        'means_diff': [],
+        'covariances_diff': [],
+        'transition_scores': [],
+        'means_scores': [],
+        'covariances_scores': []
+    }
+    
+    # Compare each pair of models
+    for i in range(n_models):
+        for j in range(i + 1, n_models):
+            model1 = hmm_models[i]
+            model2 = hmm_models[j]
+
+            # Reorder model2 to match the states of model1
+            reorder_model_states(model1, model2)
+            
+            # Compare transition matrices
+            transition_score = norm_diff(model1.transmat_, model2.transmat_)
+            results['transition_scores'].append((i, j, transition_score))
+            
+            # Compare means (Euclidean distance for 2D means)   
+            for i in range(len(hmm_models)):
+                for j in range(i + 1, len(hmm_models)):
+                    means_score = 0
+                    for state in range(len(hmm_models[i].means_)):
+                        # Compute the Euclidean distance between the means of the two models
+                        mean_diff = euclidean_distance(hmm_models[i].means_[state], hmm_models[j].means_[state])
+                        # Normalize by the magnitude of the means
+                        means_score += mean_diff / max(np.linalg.norm(hmm_models[i].means_[state]), np.linalg.norm(hmm_models[j].means_[state]))
+                    
+                    # Average the normalized differences across all states
+                    means_score /= len(hmm_models[i].means_)
+
+                    results['means_scores'].append((i, j, means_score))
+            
+                    # Compare covariances (shape and orientation of the ellipses)
+                    covariances_score = 0
+                    for state in range(len(model1.covars_)):
+                        covariances_score += covariance_shape_and_orientation_diff(model1.covars_[state], model2.covars_[state])
+                    
+                    covariances_score /= len(model1.covars_)
+                    results['covariances_scores'].append((i, j, covariances_score))
+
+            results['final_scores'] = (transition_score + means_score + covariances_score) / 3
+    
+    return results
+
+
+def HMMSimPiepelineModel2Model(self,ncomp=4,verb=False,covar='full', n_iter=100, iter=1, stimuli=None):
+    if stimuli is None:
+        StimSimsHMM=np.zeros((self.np,self.np))
+        stimuli=self.stimuli       
+    else:
+        StimSimsHMM=np.zeros((len(stimuli),len(stimuli)))
+
+
+    DatsTrain={}
+    DatsTest={}
+    DatsTrainL={}
+    DatsTestL={}
+
+    for cp,stim in enumerate(stimuli):
+        xx,yy,lengths=self.DataArrayHmm(stim,tolerance=80,verb=verb)
+        Dat=np.column_stack((xx,yy))
+        DatTr,DatTest,lenTrain,lenTest=self.MyTrainTest(Dat,lengths,ntest=3,vis=0,rand=0)
+        DatsTrain[stim]=DatTr
+        DatsTrainL[stim]=lenTrain
+        DatsTest[stim]=DatTest
+        DatsTestL[stim]=lenTest
+    
+
+    for cp1,stim1 in enumerate(stimuli):
+        with io.capture_output() as captured:
+            HMMfittedM1,sctr,scte=FitScoreHMMGauss(ncomp,DatsTrain[stim1],DatsTest[stim1], DatsTrainL[stim1],DatsTestL[stim1],covar=covar, n_iter=n_iter, iter=iter)
+        for cp2,stim2 in enumerate(stimuli):
+            with io.capture_output() as captured:
+                HMMfittedM2,sctr,scte=FitScoreHMMGauss(HMMfittedM1.n_components,DatsTrain[stim2],DatsTest[stim2], DatsTrainL[stim2],DatsTestL[stim2],covar=covar, n_iter=n_iter, iter=iter)
+            StimSimsHMM[cp2,cp1] = compare_hmm_models_with_scores([HMMfittedM1, HMMfittedM2])['final_scores']
+
+    self.VisHMMSimmat(StimSimsHMM,'Model Comp', stimuli)
+
+    return StimSimsHMM

@@ -29,6 +29,8 @@ class EyeData:
         VisGrid,
         Highlight_Sign,
         VisHeatmap,
+        VisSimmat,
+        VisHMMSimmat
     )
     from ._dataproc import (
         GetParams,
@@ -114,6 +116,8 @@ class EyeData:
             FitVisHMM,
             FitVisHMMGroups,
             HMMSimPipeline,
+            HMMSimPipelineAll2All,
+            HMMSimPiepelineModel2Model
         )
     except:
         warnings.warn(
