@@ -5,6 +5,7 @@ from .visualhelper import draw_ellipse
 import hmmlearn.hmm  as hmm
 from scipy.spatial.distance import cdist
 from IPython.utils import io
+from copy import deepcopy
  # hmm related functions start here
 def DataArrayHmm(self,stim,group=-1,tolerance=20,verb=True):
     ''' HMM data arrangement, for the format required by hmmlearn
@@ -232,7 +233,7 @@ def HMMSimPipeline(self,ncomps=[4,6],verb=False,covar='full'):
     return StimSimsHMM,np.nanmean(StimSimsHMMall,0), StimSimsHMMall
 
 
-def HMMSimPipelineAll2All(self,ncomp=4,verb=False,covar='full',ntest=3, n_iter=100, iter=1, stimuli=None):
+def HMMSimPipelineAll2All(self,ncomp=4,verb=False,covar='full',ntest=3, n_iter=100, iter=1, stimuli=None, bic=False):
     ''' all2all across compariosn evaluation of hidden markov model to data,
     with different number of components, each participants likelihood with leave-one-out cross validation
     can have a long run time with longer viewing time/lot of data 
@@ -265,13 +266,17 @@ def HMMSimPipelineAll2All(self,ncomp=4,verb=False,covar='full',ntest=3, n_iter=1
         DatsTestL[stim]=lenTest
         
     for cp1,stim1 in enumerate(stimuli):
-        HMMfitted,sctr,scte=FitScoreHMMGauss(ncomp,DatsTrain[stim1],DatsTest[stim1], DatsTrainL[stim1],DatsTestL[stim1],covar=covar, n_iter=n_iter, iter=iter)
+        HMMfitted,sctr,scte=FitScoreHMMGauss(ncomp,DatsTrain[stim1],DatsTest[stim1], DatsTrainL[stim1],DatsTestL[stim1],covar=covar, n_iter=n_iter, iter=iter, bic=bic)
         for cp2,stim2 in enumerate(stimuli):
-            StimSimsHMMTrain[cp2,cp1]=HMMfitted.score(DatsTrain[stim2],DatsTrainL[stim2])/np.sum(DatsTrainL[stim2])
-            StimSimsHMMTest[cp2,cp1]=HMMfitted.score(DatsTest[stim2],DatsTestL[stim2])/np.sum(DatsTestL[stim2])
-    
-    self.VisSimmat(StimSimsHMMTrain,'Train', stimuli)
-    self.VisSimmat(StimSimsHMMTest,'Test', stimuli)
+            if bic:
+                StimSimsHMMTrain[cp2,cp1]=HMMfitted.bic(DatsTrain[stim2])/np.sum(DatsTrainL[stim2])
+                StimSimsHMMTest[cp2,cp1]=HMMfitted.bic(DatsTest[stim2])/np.sum(DatsTestL[stim2])
+            else:
+                StimSimsHMMTrain[cp2,cp1]=HMMfitted.score(DatsTrain[stim2],DatsTrainL[stim2])/np.sum(DatsTrainL[stim2])
+                StimSimsHMMTest[cp2,cp1]=HMMfitted.score(DatsTest[stim2],DatsTestL[stim2])/np.sum(DatsTestL[stim2])
+
+    self.VisSimmat(StimSimsHMMTrain,'Train', stimuli, bic=bic)
+    self.VisSimmat(StimSimsHMMTest,'Test', stimuli, bic=bic)
     
     return StimSimsHMMTrain,StimSimsHMMTest
 
@@ -286,6 +291,7 @@ def norm_diff(matrix1, matrix2):
     Returns:
     float: The normalized norm of the difference.
     """
+    matrix1, matrix2 = pad_to_match_shape(matrix1, matrix2)
     diff_norm = np.linalg.norm(matrix1 - matrix2)
     normalization_factor = np.linalg.norm(matrix1) + np.linalg.norm(matrix2)
     
@@ -350,7 +356,6 @@ def reorder_model_states(model1, model2):
     Returns:
     reordered_model2: model2 with reordered states to match model1.
     """
-
     # Step 1: Find the best correspondence between states by comparing the means
     mean_distances = cdist(model1.means_, model2.means_, metric='euclidean')
     best_match = np.argmin(mean_distances, axis=1)
@@ -361,6 +366,19 @@ def reorder_model_states(model1, model2):
     # Reorder covariances
     model2.covars_ = model2.covars_[best_match]
 
+
+def pad_to_match_shape(matrix1, matrix2):
+    """
+    Pads the smaller matrix to match the larger matrix shape with zeros.
+    """
+    max_shape = (max(matrix1.shape[0], matrix2.shape[0]), max(matrix1.shape[1], matrix2.shape[1]))
+    padded1 = np.zeros(max_shape)
+    padded2 = np.zeros(max_shape)
+    
+    padded1[:matrix1.shape[0], :matrix1.shape[1]] = matrix1
+    padded2[:matrix2.shape[0], :matrix2.shape[1]] = matrix2
+
+    return padded1, padded2
 
 def compare_hmm_models_with_scores(hmm_models):
     """
@@ -457,4 +475,123 @@ def HMMSimPiepelineModel2Model(self,ncomp=4,verb=False,covar='full', n_iter=100,
 
     self.VisHMMSimmat(StimSimsHMM,'Model Comp', stimuli)
 
+    return StimSimsHMM
+
+def HMMSimPiepelineModel2ModelOpt(self, ncomp=4, verb=False, covar='full', n_iter=100, iter=1, stimuli=None):
+    if stimuli is None:
+        StimSimsHMM = np.zeros((self.np, self.np))
+        stimuli = self.stimuli
+    else:
+        StimSimsHMM = np.zeros((len(stimuli), len(stimuli)))
+
+    DatsTrain = {}
+    DatsTest = {}
+    DatsTrainL = {}
+    DatsTestL = {}
+
+    # Preprocess data for all stimuli
+    for cp, stim in enumerate(stimuli):
+        xx, yy, lengths = self.DataArrayHmm(stim, tolerance=80, verb=verb)
+        Dat = np.column_stack((xx, yy))
+        DatTr, DatTest, lenTrain, lenTest = self.MyTrainTest(Dat, lengths, ntest=3, vis=0, rand=0)
+        DatsTrain[stim] = DatTr
+        DatsTrainL[stim] = lenTrain
+        DatsTest[stim] = DatTest
+        DatsTestL[stim] = lenTest
+
+    # Dictionary to store the trained HMM models to reuse
+    trained_models = {}
+
+    # Calculate similarity matrix only for the lower triangle
+    for cp1, stim1 in enumerate(stimuli):
+        if stim1 in trained_models:
+            HMMfittedM1 = trained_models[stim1]
+        else:
+            with io.capture_output() as captured:
+                # Fit HMM for the first stimulus
+                HMMfittedM1, sctr, scte = FitScoreHMMGauss(
+                    ncomp, DatsTrain[stim1], DatsTest[stim1],
+                    DatsTrainL[stim1], DatsTestL[stim1],
+                    covar=covar, n_iter=n_iter, iter=iter
+                )
+            # Store the trained HMM model to avoid redundant fitting
+            trained_models[stim1] = HMMfittedM1
+        
+        for cp2 in range(cp1 + 1):  # Only compute for lower triangular matrix, including diagonal
+            stim2 = stimuli[cp2]
+            # Check if the model has been trained before or if it's the same (diagonal) otherwise the two models are exactly the same and the score is 0
+            if stim1 == stim2 or stim2 not in trained_models:
+                with io.capture_output() as captured:
+                    # Fit HMM for the second stimulus
+                    HMMfittedM2, sctr, scte = FitScoreHMMGauss(
+                        ncomp, DatsTrain[stim2], DatsTest[stim2],
+                        DatsTrainL[stim2], DatsTestL[stim2],
+                        covar=covar, n_iter=n_iter, iter=iter
+                    )
+                # Store the model if it hasn't been used before
+                trained_models[stim2] = HMMfittedM2
+            else:
+                HMMfittedM2 = trained_models[stim2]
+            
+            # Calculate similarity score and populate both [cp2, cp1] and [cp1, cp2]
+            StimSimsHMM[cp1, cp2] = compare_hmm_models_with_scores([HMMfittedM1, HMMfittedM2])['final_scores']
+            StimSimsHMM[cp2, cp1] = StimSimsHMM[cp1, cp2]
+
+    self.VisHMMSimmat(StimSimsHMM, 'Model Comp', stimuli)
+
+    return StimSimsHMM
+
+
+def HMMSimPipelineSubject2Subject(self, stim=1, ncomp=4,verb=False,covar='full', n_iter=100, iter=1, subj=-1):
+    ''' 
+    Compare the similarity between subjects for a given stimulus using HMM.
+    '''
+
+    def fit_hmm_model(Dat1, Dat1len, ncomp, covar, n_iter, iter):
+        best_score = -np.inf
+        best_model = None
+        if isinstance(ncomp, int):
+            n_comp = [ncomp]
+        else:
+            n_comp = ncomp
+        for comp in n_comp:
+            HMM = hmm.GaussianHMM(n_components=comp, covariance_type=covar, n_iter=n_iter)
+            for _ in range(iter):
+                with io.capture_output() as captured:
+                    try:
+                        HMM.fit(Dat1, Dat1len)
+                        sc = HMM.score(Dat1, Dat1len) / Dat1len
+                    except:
+                        sc = -np.inf
+                if sc > best_score:
+                    best_score = sc
+                    best_model = deepcopy(HMM)
+        if best_score == -np.inf:
+            raise ValueError('No model could be fitted: try different parameters')
+        return best_model
+
+    X,Y,subjects = self.DataArrayHmm(stim, tolerance=80, verb=verb)
+    Dat = np.column_stack((X,Y))
+    dat_x_subj = np.cumsum(subjects)
+
+    if subj==-1:
+        StimSimsHMM=np.zeros((len(subjects),len(subjects)))
+    else:
+        StimSimsHMM=np.zeros((subj,subj))
+        
+    for cp1,_ in enumerate(subjects):
+        if cp1==0:
+            Dat1 = Dat[:dat_x_subj[cp1]]
+        else:
+            Dat1 = Dat[dat_x_subj[cp1-1]:dat_x_subj[cp1]]
+        HMMfitted = fit_hmm_model(Dat1, subjects[cp1], ncomp, covar, n_iter, iter)
+        for cp2,_ in enumerate(subjects):
+            if cp2==0:
+                Dat2 = Dat[:dat_x_subj[cp2]]
+            else:
+                Dat2 = Dat[dat_x_subj[cp2-1]:dat_x_subj[cp2]]
+            StimSimsHMM[cp2,cp1]=HMMfitted.score(Dat2, subjects[cp2])/ subjects[cp2]
+
+    self.VisSimmat(StimSimsHMM,'Subject 2 Subject', [indx for indx,_ in enumerate(subjects)])
+    
     return StimSimsHMM

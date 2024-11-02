@@ -43,18 +43,29 @@ def DiffCompsHMM(datobj,stim=0,ncomps=np.arange(2,6),NRep=10,NTest=3,covar='full
 
     
 
-def FitScoreHMMGauss(ncomp,xx,xxt,lenx,lenxxt,covar='full', n_iter=100, iter=1):
-    bestHMM, best_sctr, best_scte = None, -np.inf, -np.inf
+def FitScoreHMMGauss(ncomp,xx,xxt,lenx,lenxxt,covar='full', n_iter=100, iter=1, bic=False):
+    bestHMM = None
+    if bic:
+        best_sctr, best_scte = np.inf, np.inf
+    else:
+        best_sctr, best_scte = -np.inf, -np.inf
     if isinstance(ncomp,int):
         ncomp = [ncomp]
 
     for c in ncomp:
         for _ in range(iter):
+            t = False
             HMM=hmm.GaussianHMM(n_components=c, covariance_type=covar, n_iter=n_iter)
             HMM.fit(xx,lenx)
-            sctr=HMM.score(xx,lenx)/np.sum(lenx)
-            scte=HMM.score(xxt,lenxxt)/np.sum(lenxxt)
-            if scte>best_scte:
+            if bic:
+                sctr=HMM.bic(xx,lenx)-c*np.log(len(xx))
+                scte=HMM.bic(xxt,lenxxt)-c*np.log(len(xxt))
+                t = sctr<best_sctr 
+            else:
+                sctr=HMM.score(xx,lenx)/np.sum(lenx)
+                scte=HMM.score(xxt,lenxxt)/np.sum(lenxxt)
+                t = sctr>best_sctr
+            if t:
                 best_scte=scte
                 best_sctr=sctr
                 bestHMM=copy.deepcopy(HMM)

@@ -119,7 +119,9 @@ class EyeData:
             FitVisHMMGroups,
             HMMSimPipeline,
             HMMSimPipelineAll2All,
-            HMMSimPiepelineModel2Model
+            HMMSimPiepelineModel2Model,
+            HMMSimPiepelineModel2ModelOpt,
+            HMMSimPipelineSubject2Subject
         )
     except:
         warnings.warn(
@@ -474,6 +476,7 @@ class EyeData:
         plt.ylabel("Y coordinate")
         plt.gca().invert_yaxis()  # Invert y-axis to match screen coordinates
         plt.show()
+
 
 
 #  class ends here

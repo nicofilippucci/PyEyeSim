@@ -201,7 +201,11 @@ def SacSimPipelineAll2All(self,divs=[4,5,7,9],Thr=5,InferS=True,normalize='add')
         SimsAll.append(SimSacP)
     return StimSims,np.nanmean(StimSimsInd,0),SimsAll
 
-
+def SacSimPipelineSubject2Subject(self,stim,divs=[4,5,7,9],Thr=5,InferS=True,normalize='add'):
+    """
+    Calculate saccade similarity between subjects for a given stimulus
+    """
+    
 
 
 def ScanpathSim2Groups(self,stim,betwcond,nHor=5,nVer=0,inferS=False,Thr=5,normalize='add'):
