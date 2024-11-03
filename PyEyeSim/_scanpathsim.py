@@ -109,6 +109,56 @@ def SaccadeSel(self,SaccadeObj,nHor,nVer=0,InferS=False):
                         Saccades[s,p,v,h]=np.array([])
     return Saccades
 
+def SaccadeSel(self, stim, SaccadeObj, nHor, nVer=0, InferS=False): 
+    ''' 
+    Overriden method to select saccades for angle comparison method for a specific stimulus
+    
+    Select saccades for angle comparison method for a specific stimulus
+    '''
+    
+    if nVer == 0:
+        nVer = nHor  # if number of vertical divisions not provided -- use same as the number of horizontal
+    
+    SaccadeAOIAngles = []
+    SaccadeAOIAnglesCross = []
+    
+    if InferS:
+        if not hasattr(self, 'boundsX'):
+            print('Running descriptives to get bounds')
+            self.RunDescriptiveFix()  
+        AOIRects = CreatAoiRects(nHor, nVer, self.boundsX, self.boundsY)
+    else:
+        AOIRects = CreatAoiRects(nHor, nVer, self.x_size, self.y_size, allsame=self.np)
+        
+    Saccades = np.zeros(((self.ns, nVer, nHor)), dtype=np.ndarray)  # Array of saccades crossing each AOI rectangle for each trial and participant
+    for s in np.arange(self.ns):
+        SaccadeAOIAngles.append(np.zeros((int(self.nsac[s, stim]), nVer, nHor)))
+        SaccadeAOIAngles[s][:] = np.nan
+        SaccadeAOIAnglesCross.append(np.zeros((int(self.nsac[s, stim]), nVer, nHor)))
+        SaccadeAOIAnglesCross[s][:] = np.nan
+        
+        for sac in range(len(SaccadeObj[s][stim])):
+            SaccadeDots = SaccadeObj[s][stim][sac].LinePoints()
+            
+            for h in range(nHor):
+                for v in range(nVer):
+                    if AOIRects[stim][h][v].Cross(SaccadeDots):
+                        SaccadeAOIAngles[s][sac, v, h] = SaccadeObj[s][stim][sac].Angle()  # Get angle of the saccade
+
+            # Select saccades that cross multiple cells
+            if np.sum(SaccadeAOIAngles[s][sac, :, :] > 0) > 1:
+                SaccadeAOIAnglesCross[s][sac, :, :] = SaccadeAOIAngles[s][sac, :, :]
+
+        # Store saccades that cross multiple AOI rectangles
+        for h in range(nHor):
+            for v in range(nVer):
+                if np.sum(np.isfinite(SaccadeAOIAnglesCross[s][:, v, h])) > 0:
+                    Saccades[s, v, h] = np.array(SaccadeAOIAnglesCross[s][~np.isnan(SaccadeAOIAnglesCross[s][:, v, h]), v, h])
+                else:
+                    Saccades[s, v, h] = np.array([])
+    
+    return Saccades
+
 
 def SacSim1Group(self,Saccades,Thr=5,p='all',normalize='add'):
     ''' calculate saccade similarity for each stimulus, between each pair of participants ,
@@ -201,13 +251,6 @@ def SacSimPipelineAll2All(self,divs=[4,5,7,9],Thr=5,InferS=True,normalize='add')
         SimsAll.append(SimSacP)
     return StimSims,np.nanmean(StimSimsInd,0),SimsAll
 
-def SacSimPipelineSubject2Subject(self,stim,divs=[4,5,7,9],Thr=5,InferS=True,normalize='add'):
-    """
-    Calculate saccade similarity between subjects for a given stimulus
-    """
-    
-
-
 def ScanpathSim2Groups(self,stim,betwcond,nHor=5,nVer=0,inferS=False,Thr=5,normalize='add'):
     if hasattr(self,'subjects')==0:
         self.GetParams()  
@@ -247,3 +290,63 @@ def ScanpathSim2Groups(self,stim,betwcond,nHor=5,nVer=0,inferS=False,Thr=5,norma
             ax[cgr1,cgr2].set_title(str(gr1)+' '+str(gr2)+' mean= '+str(np.round(SimVals[cgr1,cgr2],3)))
     
     return SimVals,SimValsSD
+
+def ScanpathSimSubject2Subject(self, stim, nHor=5, nVer=0, inferS=False, Thr=5, normalize='add'):
+    '''
+    Calculate saccade similarity for a specific stimulus, between each pair of participants.
+
+    Parameters
+    ----------
+    stim : int
+        Index of the stimulus.
+    nHor : int, optional
+        Number of horizontal divisions. The default is 5.
+    nVer : int, optional
+        Number of vertical divisions.
+        If not provided, nVer=nHor.
+    inferS : bool, optional
+        Whether to infer the bounds of the AOI rectangles.
+        The default is False.
+    Thr : int, optional
+        Threshold for similarity. The default is 5.
+    normalize : str, optional
+        If provided, must be 'add' or 'mult'. The default is 'add'.
+
+    Returns
+    -------
+    SimSacP : np.array
+        Saccade similarity matrix.
+        Shape: (self.ns, self.ns, nVer, nHor)
+    SimVals : np.array
+        Mean similarity values.
+    SimValsSD : np.array
+        Standard deviation of similarity values.
+
+    '''
+    if nVer==0:
+        nVer=nHor
+
+    SaccadeObj=self.GetSaccades()
+    SimVals=np.zeros((self.ns,self.ns))
+    SimValsSD=np.zeros((self.ns,self.ns))
+    Saccades=self.SaccadeSel(stim,SaccadeObj,nHor=nHor,nVer=nVer,InferS=inferS)
+
+    SimSacP=np.zeros((self.ns,self.ns,nVer,nHor))  
+    SimSacP[:]=np.nan
+    for s1 in range(self.ns):
+        for s2 in range(self.ns):
+            if s1!=s2:
+                if self.nsac[s1,stim]>5 and self.nsac[s2,stim]>5:                    
+                    for h in range(nHor):
+                        for v in range(nVer):
+                            if len(Saccades[s1,v,h])>0 and len(Saccades[s2,v,h])>0:                     
+                                simsacn=CalcSim(Saccades[s1,v,h],Saccades[s2,v,h],Thr=Thr)
+                                if normalize=='add':
+                                    SimSacP[s1,s2,v,h]=simsacn/(len(Saccades[s1,v,h])+len(Saccades[s2,v,h]))
+                                elif normalize=='mult':
+                                    SimSacP[s1,s2,v,h]=simsacn/(len(Saccades[s1,v,h])*len(Saccades[s2,v,h]))
+                    Vals=SimSacP[s1,s2,:,:]
+                    SimVals[s1,s2]=np.nanmean(Vals)
+                    SimValsSD[s1,s2]=np.nanstd(Vals)
+
+    return SimSacP,SimVals,SimValsSD
