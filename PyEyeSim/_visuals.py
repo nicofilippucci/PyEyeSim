@@ -262,7 +262,7 @@ def VisHeatmap(self,Stim,smap,ax=0,cutoff=0,alpha=.5,cmap='plasma',cbar=False,cb
     return
 
 
-def VisSimmat(self,simdat,title='', stimuli=None, bic=False):
+def VisSimmat(self,simdat,title='', stimuli=None, negative=False):
 
     if stimuli is None:
         stimuli=self.stimuli
@@ -271,7 +271,7 @@ def VisSimmat(self,simdat,title='', stimuli=None, bic=False):
     cols=ax.pcolor(simdat)
     ax.set_xticks(np.arange(len(stimuli))+.5,stimuli,rotation=50)
     ax.set_yticks(np.arange(len(stimuli))+.5,stimuli) #,rotation=50)
-    if bic:
+    if negative:
         ax.scatter(np.arange(len(stimuli))+.5,np.argmin(simdat,0)+.5,color='r')
     else:
         ax.scatter(np.arange(len(stimuli))+.5,np.argmax(simdat,1)+.5,color='r')
@@ -285,11 +285,30 @@ def VisHMMSimmat(self,simdat,title='', stimuli=None):
 
     fig,ax=plt.subplots()
     cols=ax.pcolor(simdat)
-    ax.set_xticks(np.arange(len(stimuli))+.5,stimuli,rotation=50)
+    ax.set_xticks(np.arange(len(stimuli)) + 0.5)  # Set ticks at the center of each square
+    ax.set_xticklabels(stimuli, rotation=50, ha='right')
     ax.set_yticks(np.arange(len(stimuli))+.5,stimuli) #,rotation=50)
     ax.scatter(np.arange(len(stimuli)) + .5, np.argmin(simdat, 0) + .5, color='r')
     plt.colorbar(cols,ax=ax)
     ax.set_title(title)
 
+def VisSimmatScaled(self,simdat,title='', stimuli=None, negative=False):
+
+    if stimuli is None:
+        stimuli=self.stimuli
+
+    fig,ax=plt.subplots()
+
+    vmin = np.percentile(simdat, 5)
+    vmax = np.percentile(simdat, 95)
+    cols = ax.pcolor(simdat, vmin=vmin, vmax=vmax)
+    ax.set_xticks(np.arange(len(stimuli))+.5,stimuli,rotation=50)
+    ax.set_yticks(np.arange(len(stimuli))+.5,stimuli) #,rotation=50)
+    if negative:
+        ax.scatter(np.arange(len(stimuli))+.5,np.argmin(simdat,0)+.5,color='r')
+    else:
+        ax.scatter(np.arange(len(stimuli))+.5,np.argmax(simdat,1)+.5,color='r')
+    plt.colorbar(cols,ax=ax)
+    ax.set_title(title)
 
 # %%

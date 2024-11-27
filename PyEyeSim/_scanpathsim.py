@@ -109,7 +109,7 @@ def SaccadeSel(self,SaccadeObj,nHor,nVer=0,InferS=False):
                         Saccades[s,p,v,h]=np.array([])
     return Saccades
 
-def SaccadeSel(self, stim, SaccadeObj, nHor, nVer=0, InferS=False): 
+def SaccadeSingleSel(self, SaccadeObj, nHor, stim, nVer=0, InferS=False): 
     ''' 
     Overriden method to select saccades for angle comparison method for a specific stimulus
     
@@ -179,8 +179,7 @@ def SacSim1Group(self,Saccades,Thr=5,p='all',normalize='add'):
                     if self.nsac[s1,p1]>5 and self.nsac[s2,p1]>5:                    
                         for h in range(nHor):
                             for v in range(nVer):
-                                if len(Saccades[s1,p1,v,h])>0 and len(Saccades[s2,p1,v,h])>0:
-                                        
+                                if len(Saccades[s1,p1,v,h])>0 and len(Saccades[s2,p1,v,h])>0: 
                                     simsacn=CalcSim(Saccades[s1,p1,v,h],Saccades[s2,p1,v,h],Thr=Thr)
                                     if normalize=='add':
                                         SimSacP[s1,s2,p1,v,h]=simsacn/(len(Saccades[s1,p1,v,h])+len(Saccades[s2,p1,v,h]))
@@ -190,7 +189,7 @@ def SacSim1Group(self,Saccades,Thr=5,p='all',normalize='add'):
     return SimSacP
 
   
-def SacSim1GroupAll2All(self,Saccades,Thr=5,p='all',normalize='add'):
+def SacSim1GroupAll2All(self,Saccades,Thr=5,p='all',normalize='add', method='default', power=1):
     ''' calculate saccade similarity for each stimulus, and across all stimuli, between each pair of participants ,
     needs saccades stored as PyEyeSim saccade objects stored in AOIs as input,
     vertical and horizontal dimensions are inferred from the input
@@ -211,17 +210,15 @@ def SacSim1GroupAll2All(self,Saccades,Thr=5,p='all',normalize='add'):
                             for h in range(nHor):
                                 for v in range(nVer):
                                     if len(Saccades[s1,p1,v,h])>0 and len(Saccades[s2,p2,v,h])>0:
-                                            
-                                        simsacn=CalcSim(Saccades[s1,p1,v,h],Saccades[s2,p2,v,h],Thr=Thr)
-                                        if normalize=='add':
-                                            SimSacP[s1,s2,p1,p2,v,h]=simsacn/(len(Saccades[s1,p1,v,h])+len(Saccades[s2,p2,v,h]))
-                                        elif normalize=='mult':
-                                            SimSacP[s1,s2,p1,p2,v,h]=simsacn/(len(Saccades[s1,p1,v,h])*len(Saccades[s2,p2,v,h]))
- 
+                                        simsacn=CalcSim(Saccades[s1,p1,v,h],Saccades[s2,p2,v,h],Thr=Thr, method=method, power=power)
+                                        if method == 'default':
+                                            if normalize=='add':
+                                                SimSacP[s1,s2,p1,p2,v,h]=simsacn/(len(Saccades[s1,p1,v,h])+len(Saccades[s2,p2,v,h]))
+                                            elif normalize=='mult':
+                                                SimSacP[s1,s2,p1,p2,v,h]=simsacn/(len(Saccades[s1,p1,v,h])*len(Saccades[s2,p2,v,h]))
+                                        else:
+                                            SimSacP[s1,s2,p1,p2,v,h]=simsacn
     return SimSacP
-
-
-
 
 def SacSimPipeline(self,divs=[4,5,7,9],Thr=5,InferS=True,normalize='add'):
     SaccadeObj=self.GetSaccades()
@@ -291,7 +288,7 @@ def ScanpathSim2Groups(self,stim,betwcond,nHor=5,nVer=0,inferS=False,Thr=5,norma
     
     return SimVals,SimValsSD
 
-def ScanpathSimSubject2Subject(self, stim, nHor=5, nVer=0, inferS=False, Thr=5, normalize='add'):
+def ScanpathSimSubject2Subject(self, stim, nHor=5, nVer=0, inferS=False, Thr=5, normalize='add', method='default'):
     '''
     Calculate saccade similarity for a specific stimulus, between each pair of participants.
 
@@ -329,24 +326,35 @@ def ScanpathSimSubject2Subject(self, stim, nHor=5, nVer=0, inferS=False, Thr=5, 
     SaccadeObj=self.GetSaccades()
     SimVals=np.zeros((self.ns,self.ns))
     SimValsSD=np.zeros((self.ns,self.ns))
-    Saccades=self.SaccadeSel(stim,SaccadeObj,nHor=nHor,nVer=nVer,InferS=inferS)
+    Saccades=self.SaccadeSingleSel(SaccadeObj,nHor=nHor,stim=stim,nVer=nVer,InferS=inferS)
 
     SimSacP=np.zeros((self.ns,self.ns,nVer,nHor))  
     SimSacP[:]=np.nan
     for s1 in range(self.ns):
+        if self.nsac[s1,stim]<=5:
+            SimVals[s1,s1]=-np.inf
+            SimValsSD[s1,s1]=-np.inf
         for s2 in range(self.ns):
             if s1!=s2:
-                if self.nsac[s1,stim]>5 and self.nsac[s2,stim]>5:                    
+                if self.nsac[s1,stim]>5 and self.nsac[s2,stim]>5:          
                     for h in range(nHor):
                         for v in range(nVer):
                             if len(Saccades[s1,v,h])>0 and len(Saccades[s2,v,h])>0:                     
-                                simsacn=CalcSim(Saccades[s1,v,h],Saccades[s2,v,h],Thr=Thr)
-                                if normalize=='add':
-                                    SimSacP[s1,s2,v,h]=simsacn/(len(Saccades[s1,v,h])+len(Saccades[s2,v,h]))
-                                elif normalize=='mult':
-                                    SimSacP[s1,s2,v,h]=simsacn/(len(Saccades[s1,v,h])*len(Saccades[s2,v,h]))
+                                simsacn=CalcSim(Saccades[s1,v,h],Saccades[s2,v,h],Thr=Thr,method=method)
+                                if method == 'default':
+                                    if normalize=='add':
+                                        SimSacP[s1,s2,v,h]=simsacn/(len(Saccades[s1,v,h])+len(Saccades[s2,v,h]))
+                                    elif normalize=='mult':
+                                        SimSacP[s1,s2,v,h]=simsacn/(len(Saccades[s1,v,h])*len(Saccades[s2,v,h]))
+                                else:
+                                    SimSacP[s1,s2,v,h]=simsacn
                     Vals=SimSacP[s1,s2,:,:]
                     SimVals[s1,s2]=np.nanmean(Vals)
                     SimValsSD[s1,s2]=np.nanstd(Vals)
+                else:
+                    SimVals[s1,s2]=-np.inf
+                    SimValsSD[s1,s2]=-np.inf
 
     return SimSacP,SimVals,SimValsSD
+
+

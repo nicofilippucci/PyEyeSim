@@ -58,8 +58,8 @@ def FitScoreHMMGauss(ncomp,xx,xxt,lenx,lenxxt,covar='full', n_iter=100, iter=1, 
             HMM=hmm.GaussianHMM(n_components=c, covariance_type=covar, n_iter=n_iter)
             HMM.fit(xx,lenx)
             if bic:
-                sctr=HMM.bic(xx,lenx)-c*np.log(len(xx))
-                scte=HMM.bic(xxt,lenxxt)-c*np.log(len(xxt))
+                sctr=HMM.bic(xx,lenx)/np.sum(lenx)
+                scte=HMM.bic(xxt,lenxxt)/np.sum(lenxxt)
                 t = sctr<best_sctr 
             else:
                 sctr=HMM.score(xx,lenx)/np.sum(lenx)

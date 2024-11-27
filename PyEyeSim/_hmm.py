@@ -275,8 +275,8 @@ def HMMSimPipelineAll2All(self,ncomp=4,verb=False,covar='full',ntest=3, n_iter=1
                 StimSimsHMMTrain[cp2,cp1]=HMMfitted.score(DatsTrain[stim2],DatsTrainL[stim2])/np.sum(DatsTrainL[stim2])
                 StimSimsHMMTest[cp2,cp1]=HMMfitted.score(DatsTest[stim2],DatsTestL[stim2])/np.sum(DatsTestL[stim2])
 
-    self.VisSimmat(StimSimsHMMTrain,'Train', stimuli, bic=bic)
-    self.VisSimmat(StimSimsHMMTest,'Test', stimuli, bic=bic)
+    self.VisSimmat(StimSimsHMMTrain,'Train', stimuli, negative=bic)
+    self.VisSimmat(StimSimsHMMTest,'Test', stimuli, negative=bic)
     
     return StimSimsHMMTrain,StimSimsHMMTest
 
@@ -364,7 +364,15 @@ def reorder_model_states(model1, model2):
     model2.means_ = model2.means_[best_match]
     
     # Reorder covariances
-    model2.covars_ = model2.covars_[best_match]
+    reordered_covars = model2.covars_[best_match]
+    
+    # Ensure covariances are positive for 'spherical' covariance type
+    if model2.covariance_type == 'spherical':
+        reordered_covars = np.maximum(reordered_covars, 1e-6)  # Replace non-positive values
+        
+    for c in range(model2.n_components-1):
+        model2.covars_[c]=reordered_covars[c]
+
 
 
 def pad_to_match_shape(matrix1, matrix2):
@@ -380,17 +388,18 @@ def pad_to_match_shape(matrix1, matrix2):
 
     return padded1, padded2
 
-def compare_hmm_models_with_scores(hmm_models):
+def compare_hmm_models_with_scores(self, models):
     """
     Compares the key matrices (transition matrix, means, covariances) of a list of GaussianHMM models,
     and adds a score indicating the similarity of the matrices.
     
     Parameters:
-    hmm_models (list): A list of GaussianHMM models to compare.
+    models (list): A list of GaussianHMM models to compare.
     
     Returns:
     dict: A dictionary containing the pairwise differences and similarity scores for each matrix type.
     """
+    hmm_models = deepcopy(models)
     n_models = len(hmm_models)
     results = {
         'transition_diff': [],
@@ -471,7 +480,7 @@ def HMMSimPiepelineModel2Model(self,ncomp=4,verb=False,covar='full', n_iter=100,
         for cp2,stim2 in enumerate(stimuli):
             with io.capture_output() as captured:
                 HMMfittedM2,sctr,scte=FitScoreHMMGauss(HMMfittedM1.n_components,DatsTrain[stim2],DatsTest[stim2], DatsTrainL[stim2],DatsTestL[stim2],covar=covar, n_iter=n_iter, iter=iter)
-            StimSimsHMM[cp2,cp1] = compare_hmm_models_with_scores([HMMfittedM1, HMMfittedM2])['final_scores']
+            StimSimsHMM[cp2,cp1] = compare_hmm_models_with_scores(self, [HMMfittedM1, HMMfittedM2])['final_scores']
 
     self.VisHMMSimmat(StimSimsHMM,'Model Comp', stimuli)
 
@@ -534,7 +543,7 @@ def HMMSimPiepelineModel2ModelOpt(self, ncomp=4, verb=False, covar='full', n_ite
                 HMMfittedM2 = trained_models[stim2]
             
             # Calculate similarity score and populate both [cp2, cp1] and [cp1, cp2]
-            StimSimsHMM[cp1, cp2] = compare_hmm_models_with_scores([HMMfittedM1, HMMfittedM2])['final_scores']
+            StimSimsHMM[cp1, cp2] = compare_hmm_models_with_scores(self, [HMMfittedM1, HMMfittedM2])['final_scores']
             StimSimsHMM[cp2, cp1] = StimSimsHMM[cp1, cp2]
 
     self.VisHMMSimmat(StimSimsHMM, 'Model Comp', stimuli)
@@ -542,7 +551,7 @@ def HMMSimPiepelineModel2ModelOpt(self, ncomp=4, verb=False, covar='full', n_ite
     return StimSimsHMM
 
 
-def HMMSimPipelineSubject2Subject(self, stim=1, ncomp=4,verb=False,covar='full', n_iter=100, iter=1, subj=-1):
+def HMMSimPipelineSubject2Subject(self, stim=1, ncomp=4,verb=False,covar='full', n_iter=100, iter=1, subj=-1, vis='default'):
     ''' 
     Compare the similarity between subjects for a given stimulus using HMM.
     '''
@@ -568,7 +577,8 @@ def HMMSimPipelineSubject2Subject(self, stim=1, ncomp=4,verb=False,covar='full',
                     best_model = deepcopy(HMM)
         if best_score == -np.inf:
             raise ValueError('No model could be fitted: try different parameters')
-        return best_model
+        final_model = deepcopy(best_model)
+        return final_model
 
     X,Y,subjects = self.DataArrayHmm(stim, tolerance=80, verb=verb)
     Dat = np.column_stack((X,Y))
@@ -592,6 +602,9 @@ def HMMSimPipelineSubject2Subject(self, stim=1, ncomp=4,verb=False,covar='full',
                 Dat2 = Dat[dat_x_subj[cp2-1]:dat_x_subj[cp2]]
             StimSimsHMM[cp2,cp1]=HMMfitted.score(Dat2, subjects[cp2])/ subjects[cp2]
 
-    self.VisSimmat(StimSimsHMM,'Subject 2 Subject', [indx for indx,_ in enumerate(subjects)])
+    if vis=='default':
+        self.VisSimmat(StimSimsHMM,'Subject 2 Subject', [indx for indx,_ in enumerate(subjects)])
+    elif vis=='scaled':
+        self.VisSimmatScaled(StimSimsHMM,'Subject 2 Subject', [indx for indx,_ in enumerate(subjects)])
     
     return StimSimsHMM

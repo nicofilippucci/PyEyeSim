@@ -30,7 +30,8 @@ class EyeData:
         Highlight_Sign,
         VisHeatmap,
         VisSimmat,
-        VisHMMSimmat
+        VisHMMSimmat,
+        VisSimmatScaled,
     )
     from ._dataproc import (
         GetParams,
@@ -79,6 +80,7 @@ class EyeData:
         SacSimPipeline,
         SacSim1Group,
         SaccadeSel,
+        SaccadeSingleSel,
         ScanpathSim2Groups,
         SacSimPipelineAll2All,
         SacSim1GroupAll2All,
@@ -119,6 +121,7 @@ class EyeData:
             FitLOOHMM,
             FitVisHMM,
             FitVisHMMGroups,
+            compare_hmm_models_with_scores,
             HMMSimPipeline,
             HMMSimPipelineAll2All,
             HMMSimPiepelineModel2Model,

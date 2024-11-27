@@ -121,14 +121,39 @@ class SaccadeLine:
         return LineX,LineY
     
 
-def CalcSim(saccades1,saccades2,Thr=5):
+def CalcSim(saccades1,saccades2,Thr=5, method='default', power=1):
     ''' calculcate angle based similarity for two arrays of saccade objects (for each cell)'''
-    A=matlib.repmat(saccades1,len(saccades2),1)   # matrix of s1 saccades in cell
-    B=matlib.repmat(saccades2,len(saccades1),1).T  # matrix of s2 saccades in cell
-    simsacn=np.sum(np.abs(A-B)<Thr)
-    A[A>180]-=180
-    A[A<180]+=180                                       
-    simsacn+=np.sum(np.abs(A-B)<Thr) 
-    return simsacn
+    if method=='default':
+        A=matlib.repmat(saccades1,len(saccades2),1)   # matrix of s1 saccades in cell
+        B=matlib.repmat(saccades2,len(saccades1),1).T  # matrix of s2 saccades in cell
+        simsacn=np.sum(np.abs(A-B)<Thr)
+        A[A>180]-=180
+        A[A<180]+=180                                       
+        simsacn+=np.sum(np.abs(A-B)<Thr) 
+        return simsacn
+    elif method=='power':
+        return angle_difference_power(saccades1, saccades2, power=power)
+    elif method=='peak180':
+        return angle_difference_peak180(saccades1, saccades2, power=power)
+    else:
+        raise ValueError('Invalid method: {}'.format(method))
 
+def angle_difference_power(saccades1,saccades2,power=1):
+    ''' this methods calculates differences between 0 and 90 degrees, between all pairs of saccades, than normalizes to the range 0-1, than averages
+    by default it is just the mean absolute difference, but can be used for different exponentials by changing power from the default of 1'''
+    diffs = np.abs(saccades1[:, np.newaxis] - saccades2) % 360
+    mask = diffs > 180
+    diffs[mask] = 360 - diffs[mask]
+    return np.mean(np.abs((np.minimum(diffs, 180 - diffs)/90))**power)
 
+def angle_difference_peak180(saccades1, saccades2, power=1):
+    """
+    Calculates differences between 0 and 180 degrees, with a peak of 1 at 180 degrees.
+    Normalizes to the range 0–1, with a decrease back to 0 after 180 degrees.
+    Allows for custom exponentials via the `power` parameter.
+    """
+    diffs = np.abs(saccades1[:, np.newaxis] - saccades2) % 360
+    diffs = np.minimum(diffs, 360 - diffs) 
+    normalized_diffs = (np.abs(diffs) / 180) 
+    symmetric_diffs = 1 - np.abs(1 - normalized_diffs) 
+    return np.mean(symmetric_diffs**power)

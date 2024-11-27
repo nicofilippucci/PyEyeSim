@@ -96,36 +96,40 @@ def get_data(self, stim, group=-1, tolerance=20, subject=-1, remove_subj=False):
     list
         The list of fixation lengths for each subject.
     """
-    
+
     XX, YY, list_lengths = self.DataArrayHmm(stim, group, tolerance=tolerance, verb=False)
-
     if subject != -1:
+        if isinstance(subject, int):
+            subject = [subject]
+        final_XX = np.array([])
+        final_YY = np.array([])
+        final_list_lengths = np.array([], dtype=int)
+        lengths_sum = np.cumsum(list_lengths)
+        for s in subject:
+            try:
+                l = list_lengths[s]
+                if s == 0:
+                    x = XX[:l]
+                    y = YY[:l]
+                else:
+                    x = XX[lengths_sum[s-1]:lengths_sum[s]]
+                    y = YY[lengths_sum[s-1]:lengths_sum[s]]
+            except Exception as e:
+                raise ValueError(f"Subject {s} not found in group {group}.")
+            final_XX = np.concatenate((final_XX, x))
+            final_YY = np.concatenate((final_YY, y))
+            final_list_lengths = np.append(final_list_lengths, [l])
         if remove_subj:
-            try:
-                lengths_sum = np.cumsum(list_lengths)
-                if subject == 0:
-                    XX = XX[list_lengths[0]:]
-                    YY = YY[list_lengths[0]:]
-                else:
-                    XX = np.concatenate([XX[:lengths_sum[subject-1]], XX[lengths_sum[subject]:]])
-                    YY = np.concatenate([YY[:lengths_sum[subject-1]], YY[lengths_sum[subject]:]])
-                list_lengths = np.concatenate([list_lengths[:subject], list_lengths[subject+1:]])
-            except Exception as e:
-                raise ValueError(f"Subject {subject} not found in the data.")
-        else:
-            try:
-                lengths_sum = np.cumsum(list_lengths)
-                list_lengths = list_lengths[subject]
-                if subject == 0:
-                    XX = XX[:list_lengths]
-                    YY = YY[:list_lengths]
-                else:
-                    XX = XX[lengths_sum[subject-1]:lengths_sum[subject]]
-                    YY = YY[lengths_sum[subject-1]:lengths_sum[subject]]
-            except Exception as e:
-                raise ValueError(f"Subject {subject} not found in the data.")
+            # if the value is in final_XX remove it from XX, the same for final_YY and YY and final_list_lengths and list_lengths
+            final_XX = np.array([x for x in XX if x not in final_XX])
+            final_YY = np.array([y for y in YY if y not in final_YY])
+            final_list_lengths = np.array([l for l in list_lengths if l not in final_list_lengths])
+    else:
+        final_XX = XX
+        final_YY = YY
+        final_list_lengths = list_lengths
 
-    return XX, YY, list_lengths
+    return final_XX, final_YY, final_list_lengths
 
 def fixation_sequence(self, lengths, method='random', subject=None):
     """
@@ -439,12 +443,12 @@ def calculate_starting_likelihood(self, X, Y, list_lengths, n_components_list, c
             aic_scores_all.append(aic_scores)
 
         if new_models == []:
-            new_models = models
+            new_models = copy.deepcopy(models)
             best_score = bic_scores
         else:
             for i, model in enumerate(models):
                 if bic_scores[i] < best_score[i]:
-                    new_models[i] = model
+                    new_models[i] = copy.deepcopy(models)
                     best_score[i] = bic_scores[i]
 
     # Convert lists to arrays for easier manipulation
@@ -701,7 +705,7 @@ def create_plot(self, ax, matrix, ticks, title, xlabel, ylabel, method):
     ax.set_ylabel(ylabel)
     ax.set_title(title)
 
-def plot_starting_likelihood(self, n_components_list, bic_scores_all, log_likelihood_scores_all=None, aic_scores_all=None):
+def plot_starting_likelihood(self, n_components_list, bic_scores_all, log_likelihood_scores_all=None, aic_scores_all=None, group=None):
     """
     Plot the starting likelihood scores.
 
@@ -728,9 +732,12 @@ def plot_starting_likelihood(self, n_components_list, bic_scores_all, log_likeli
     if log_likelihood_scores_all is None:
         # Plot BIC as error bars
         plt.errorbar(n_components_list, bic_mean, yerr=[bic_mean - bic_min, bic_max - bic_mean], fmt='o-', color='blue')
-        plt.title('BIC Scores of Models with Different Components using Real Data')
         plt.xlabel('Number of Components')
         plt.ylabel('Score')
+        if group is not None:
+            plt.title(f'BIC Scores of Models with Different Components using Real Data (Group {group})')
+        else:
+            plt.title('BIC Scores of Models with Different Components using Real Data')
     else:
         log_likelihood_min, log_likelihood_max, log_likelihood_mean = min_max_avg(self, log_likelihood_scores_all)
         aic_min, aic_max, aic_mean = min_max_avg(self, aic_scores_all)
@@ -748,13 +755,17 @@ def plot_starting_likelihood(self, n_components_list, bic_scores_all, log_likeli
         ax2.plot(n_components_list, log_likelihood_mean, color='orange', marker='o', label='Log Likelihood Mean')
         ax2.fill_between(n_components_list, log_likelihood_min, log_likelihood_max, color='orange', alpha=0.3)
 
-        plt.title('Likelihood Scores of Models with Different Components using Real Data')
         plt.xlabel('Number of Components')
         plt.ylabel('Log Likelihood Score')
 
         # Add legends for both axes
         lines2, labels2 = ax2.get_legend_handles_labels()
         plt.legend(lines + lines2, labels + labels2, loc='upper right')
+
+        if group is not None:
+            plt.title(f'Likelihood Scores of Models with Different Components using Real Data (Group {group})')
+        else:
+            plt.title('Likelihood Scores of Models with Different Components using Real Data')
 
 
     # Set x-axis ticks to only n_components_list values
@@ -781,54 +792,58 @@ def plot_comparison_likelihood(self, n_components_list, scores, labels=None):
     labels : list of str, default=None
         A list of labels corresponding to the score arrays for the legend.
     """
-    plt.figure(figsize=(10, 6))
-
+    if len(n_components_list) > 1:
+        plt.figure(figsize=(10, 6))
     # Plot BIC and AIC scores if available
     for idx, score_set in enumerate(scores):
         log_likelihood_scores_all, bic_scores_all, aic_scores_all = score_set
-        
-        # Plot BIC scores
-        if bic_scores_all is not None:
-            bic_min, bic_max, bic_mean = min_max_avg(self, bic_scores_all)
-            plt.plot(n_components_list, bic_mean, marker='o', label=f'BIC Group {labels[idx]}' if labels else f'BIC Group {idx+1}')
-            plt.fill_between(n_components_list, bic_min, bic_max, alpha=0.3)
+        if len(n_components_list) == 1:
+            group = labels[idx] if labels else idx+1
+            plot_starting_likelihood(self, n_components_list, bic_scores_all, log_likelihood_scores_all, aic_scores_all, group=group)
+        else:
+            # Plot BIC scores
+            if bic_scores_all is not None:
+                bic_min, bic_max, bic_mean = min_max_avg(self, bic_scores_all)
+                plt.plot(n_components_list, bic_mean, marker='o', label=f'BIC Group {labels[idx]}' if labels else f'BIC Group {idx+1}')
+                plt.fill_between(n_components_list, bic_min, bic_max, alpha=0.3)
 
-        # Plot AIC scores
-        if aic_scores_all is not None:
-            aic_min, aic_max, aic_mean = min_max_avg(self, aic_scores_all)
-            plt.plot(n_components_list, aic_mean, marker='o', label=f'AIC Group {labels[idx]}' if labels else f'AIC Group {idx+1}')
-            plt.fill_between(n_components_list, aic_min, aic_max, alpha=0.3)
-
-    # Plot Log Likelihood scores on the second y-axis if available
-    if any(score_set[0] is not None for score_set in scores):  # Check if any log likelihood data exists
-        ax2 = plt.gca().twinx()  # Create a second y-axis
-        for idx, score_set in enumerate(scores):
-            log_likelihood_scores_all, _, _ = score_set
-            if log_likelihood_scores_all is not None:
-                log_likelihood_min, log_likelihood_max, log_likelihood_mean = min_max_avg(self, log_likelihood_scores_all)
-                ax2.plot(n_components_list, log_likelihood_mean, color='orange', marker='o', label=f'Log Likelihood Group {labels[idx]}' if labels else f'Log Likelihood Group {idx+1}')
-                ax2.fill_between(n_components_list, log_likelihood_min, log_likelihood_max, color='orange', alpha=0.3)
-
-        ax2.set_ylabel('Log Likelihood Score')
-
-    # Final plot customizations
-    plt.xlabel('Number of Components')
-    plt.ylabel('Information Criterion Score')
-    plt.title('Comparison of Likelihood Scores of Models with Different Components')
+            # Plot AIC scores
+            if aic_scores_all is not None:
+                aic_min, aic_max, aic_mean = min_max_avg(self, aic_scores_all)
+                plt.plot(n_components_list, aic_mean, marker='o', label=f'AIC Group {labels[idx]}' if labels else f'AIC Group {idx+1}')
+                plt.fill_between(n_components_list, aic_min, aic_max, alpha=0.3)
     
-    # Set x-axis ticks to only n_components_list values
-    plt.xticks(n_components_list)
+    if len(n_components_list) > 1:
+        # Plot Log Likelihood scores on the second y-axis if available
+        if any(score_set[0] is not None for score_set in scores):  # Check if any log likelihood data exists
+            ax2 = plt.gca().twinx()  # Create a second y-axis
+            for idx, score_set in enumerate(scores):
+                log_likelihood_scores_all, _, _ = score_set
+                if log_likelihood_scores_all is not None:
+                    log_likelihood_min, log_likelihood_max, log_likelihood_mean = min_max_avg(self, log_likelihood_scores_all)
+                    ax2.plot(n_components_list, log_likelihood_mean, color='orange', marker='o', label=f'Log Likelihood Group {labels[idx]}' if labels else f'Log Likelihood Group {idx+1}')
+                    ax2.fill_between(n_components_list, log_likelihood_min, log_likelihood_max, color='orange', alpha=0.3)
 
-    # Combine legends from both axes if log likelihood is plotted
-    if any(score_set[0] is not None for score_set in scores):
-        lines, labels_left = plt.gca().get_legend_handles_labels()
-        lines2, labels_right = ax2.get_legend_handles_labels()
-        plt.legend(lines + lines2, labels_left + labels_right, loc='upper right')
-    else:
-        plt.legend(loc='upper right')
+            ax2.set_ylabel('Log Likelihood Score')
 
-    plt.grid(True)
-    plt.show()
+        # Final plot customizations
+        plt.xlabel('Number of Components')
+        plt.ylabel('Information Criterion Score')
+        plt.title('Comparison of Likelihood Scores of Models with Different Components')
+        
+        # Set x-axis ticks to only n_components_list values
+        plt.xticks(n_components_list)
+
+        # Combine legends from both axes if log likelihood is plotted
+        if any(score_set[0] is not None for score_set in scores):
+            lines, labels_left = plt.gca().get_legend_handles_labels()
+            lines2, labels_right = ax2.get_legend_handles_labels()
+            plt.legend(lines + lines2, labels_left + labels_right, loc='upper right')
+        else:
+            plt.legend(loc='upper right')
+
+        plt.grid(True)
+        plt.show()
 
 
 def plot_likelihood_matrix(self, likelihood_matrix, n_components_list, iteration, evaluation='score'):
