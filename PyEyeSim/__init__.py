@@ -36,7 +36,8 @@ class EyeData:
         MyTrainTestVis,
         VisGrid,
         Highlight_Sign,
-        VisHeatmap,VisSimmat
+        VisHeatmap,VisSimmat,
+        Vis_Saccade_Angles
     )
     from ._dataproc import (
         GetParams,
@@ -101,7 +102,8 @@ class EyeData:
             FitVisHMM,
             FitVisHMMGroups,
             HMMSimPipeline,
-            HMMSimPipelineAll2All
+            HMMSimPipelineAll2All,
+            HMMIndividual1Stim
         )
     except:
         warnings.warn(
