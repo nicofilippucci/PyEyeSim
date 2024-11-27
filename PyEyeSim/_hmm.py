@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from .hmmhelper import DiffCompsHMM,FitScoreHMMGauss
+from .hmmhelper import DiffCompsHMM,FitScoreHMMGauss,FitScoreHMMGauss_ind
 from .visualhelper import draw_ellipse
 import hmmlearn.hmm  as hmm
 from scipy.spatial.distance import cdist
@@ -18,6 +18,7 @@ def DataArrayHmm(self,stim,group=-1,tolerance=20,verb=True):
     YY=np.array([])
     Lengths=np.array([],dtype=int)
     self.suseHMM=np.array([],dtype=int)
+    MissingSubj=[]
     #print('org data for stim')
     for cs,s in enumerate(self.subjects):
         if group!=-1:
@@ -41,8 +42,9 @@ def DataArrayHmm(self,stim,group=-1,tolerance=20,verb=True):
                 self.suseHMM=np.append(self.suseHMM,s)
             elif verb:
                 print('not enough fixations for subj', s)
+                MissingSubj.append(cs)
 
-    return XX,YY,Lengths
+    return XX,YY,Lengths,MissingSubj
 
 
 def MyTrainTest(self,Dat,Lengths,ntest,vis=0,rand=1,totest=0):
@@ -79,7 +81,7 @@ def FitLOOHMM(self,ncomp,stim,covar='full',verb=False):
     stim: stimulus code 
     covar: covariance type 'full' or  'tied' '''
     NTest=1
-    xx,yy,lengths=self.DataArrayHmm(stim,tolerance=80,verb=verb)
+    xx,yy,lengths,MissingSubj=self.DataArrayHmm(stim,tolerance=80,verb=verb)
     Dat=np.column_stack((xx,yy))
     ScoresLOO=np.zeros(len(self.suseHMM))
     if verb:
@@ -96,7 +98,7 @@ def FitVisHMM(self,stim,ncomp=3,covar='full',ax=0,ax2=0,NTest=5,showim=True,verb
     ncomp: number of HMM components
     covar: covariance structure full','tied','spherical' ,'diag'
     Ntest: number of participants to test'''
-    xx,yy,lengths=self.DataArrayHmm(stim,tolerance=80,verb=verb)
+    xx,yy,lengths,MissingSubj=self.DataArrayHmm(stim,tolerance=80,verb=verb)
     Dat=np.column_stack((xx,yy))
     
     DatTr,DatTest,lenTrain,lenTest=self.MyTrainTest(Dat,lengths,NTest,vis=0,rand=1)
@@ -154,7 +156,7 @@ def FitVisHMMGroups(self,stim,betwcond,ncomp=3,covar='full',ax=0,ax2=0,NTest=3,s
         XXTest=[]
         LengthsTest=[]
         for cgr,gr in enumerate(Grs):
-            xx,yy,Lengths=self.DataArrayHmm(stim,group=cgr,tolerance=50,verb=False)
+            xx,yy,Lengths,MissingSubj=self.DataArrayHmm(stim,group=cgr,tolerance=50,verb=False)
             if np.sum(np.shape(xx))==0:
                 print('data not found')
             Dat=np.column_stack((xx,yy))
@@ -257,7 +259,7 @@ def HMMSimPipelineAll2All(self,ncomp=4,verb=False,covar='full',ntest=3, n_iter=1
     DatsTestL={}
     
     for cp,stim in enumerate(stimuli):
-        xx,yy,lengths=self.DataArrayHmm(stim,tolerance=80,verb=verb)
+        xx,yy,lengths,MissingSubj=self.DataArrayHmm(stim,tolerance=80,verb=verb)
         Dat=np.column_stack((xx,yy))
         DatTr,DatTest,lenTrain,lenTest=self.MyTrainTest(Dat,lengths,ntest=ntest,vis=0,rand=0)
         DatsTrain[stim]=DatTr
@@ -608,3 +610,15 @@ def HMMSimPipelineSubject2Subject(self, stim=1, ncomp=4,verb=False,covar='full',
         self.VisSimmatScaled(StimSimsHMM,'Subject 2 Subject', [indx for indx,_ in enumerate(subjects)])
     
     return StimSimsHMM
+
+def HMMIndividual1Stim(self,stim,ncomp=5,covar='full',verb=False):
+    ''' Individual observer level, hidden markov model similarity for a given stimulus'''
+    xx,yy,lengths,MissingSubj=self.DataArrayHmm(stim,tolerance=80,verb=verb)
+    print('missing subj: ',MissingSubj)
+    Dat=np.column_stack((xx,yy))
+    IndSims=np.zeros((len(lengths),len(lengths)))
+    for s in range(len(lengths)):
+        HMM,scores= FitScoreHMMGauss_ind(ncomp,Dat,lengths,s,covar=covar)
+        IndSims[:,s]=scores
+    return IndSims
+     

@@ -32,6 +32,9 @@ class EyeData:
         VisSimmat,
         VisHMMSimmat,
         VisSimmatScaled,
+        VisHeatmap,
+        VisSimmat,
+        Vis_Saccade_Angles
     )
     from ._dataproc import (
         GetParams,
@@ -126,7 +129,8 @@ class EyeData:
             HMMSimPipelineAll2All,
             HMMSimPiepelineModel2Model,
             HMMSimPiepelineModel2ModelOpt,
-            HMMSimPipelineSubject2Subject
+            HMMSimPipelineSubject2Subject,
+            HMMIndividual1Stim
         )
     except:
         warnings.warn(
