@@ -124,12 +124,11 @@ class SaccadeLine:
 def CalcSim(saccades1,saccades2,Thr=5, method='default', power=1):
     ''' calculcate angle based similarity for two arrays of saccade objects (for each cell)'''
     if method=='default':
-        A=matlib.repmat(saccades1,len(saccades2),1)   # matrix of s1 saccades in cell
-        B=matlib.repmat(saccades2,len(saccades1),1).T  # matrix of s2 saccades in cell
+        saccades1[saccades1>180]-=180
+        saccades2[saccades2>180]-=180
+        A=saccades1[:,np.newaxis]
+        B=saccades2[np.newaxis,:]
         simsacn=np.sum(np.abs(A-B)<Thr)
-        A[A>180]-=180
-        A[A<180]+=180                                       
-        simsacn+=np.sum(np.abs(A-B)<Thr) 
         return simsacn
     elif method=='power':
         return angle_difference_power(saccades1, saccades2, power=power)

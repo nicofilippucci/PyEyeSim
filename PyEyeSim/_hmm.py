@@ -582,10 +582,9 @@ def HMMSimPipelineSubject2Subject(self, stim=1, ncomp=4,verb=False,covar='full',
         final_model = deepcopy(best_model)
         return final_model
 
-    X,Y,subjects = self.DataArrayHmm(stim, tolerance=80, verb=verb)
+    X,Y,subjects,_ = self.DataArrayHmm(stim, tolerance=80, verb=verb)
     Dat = np.column_stack((X,Y))
     dat_x_subj = np.cumsum(subjects)
-
     if subj==-1:
         StimSimsHMM=np.zeros((len(subjects),len(subjects)))
     else:
@@ -605,7 +604,7 @@ def HMMSimPipelineSubject2Subject(self, stim=1, ncomp=4,verb=False,covar='full',
             StimSimsHMM[cp2,cp1]=HMMfitted.score(Dat2, subjects[cp2])/ subjects[cp2]
 
     if vis=='default':
-        self.VisSimmat(StimSimsHMM,'Subject 2 Subject', [indx for indx,_ in enumerate(subjects)])
+        self.VisSimmat(StimSimsHMM, title='Subject 2 Subject', stimuli=[indx for indx,_ in enumerate(subjects)])
     elif vis=='scaled':
         self.VisSimmatScaled(StimSimsHMM,'Subject 2 Subject', [indx for indx,_ in enumerate(subjects)])
     

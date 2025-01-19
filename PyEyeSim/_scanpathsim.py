@@ -11,7 +11,7 @@ from scipy import stats,ndimage
 import pandas as pd
 import matplotlib.pyplot as plt
 import time
-from .scanpathsimhelper import AOIbounds,CreatAoiRects,Rect,SaccadeLine,CalcSim, CheckCoor,CalcSimAlt,angle_difference_power
+from .scanpathsimhelper import AOIbounds,CreatAoiRects,Rect,SaccadeLine,CalcSim, CheckCoor,CalcSimAlt,angle_difference_power, angle_difference_peak180
 
 
 
@@ -88,8 +88,6 @@ def SaccadeSel(self,SaccadeObj,nHor,nVer=0,InferS=False):
             SaccadeAOIAnglesCross[s][p][:]=np.nan
             for sac in range(len(SaccadeObj[s][p])):
                 SaccadeDots=SaccadeObj[s][p][sac].LinePoints()
-                
-                
                 for h in range(nHor):
                     for v in range(nVer):
                        # print(h,v)
@@ -100,13 +98,28 @@ def SaccadeSel(self,SaccadeObj,nHor,nVer=0,InferS=False):
                 if np.sum(SaccadeAOIAngles[s][p][sac,:,:]>0)>1:  # select saccaded that use multiple cells
                     #print('CrossSel',SaccadeAOIAngles[s][p][sac,:,:])
                     SaccadeAOIAnglesCross[s][p][sac,:,:]=SaccadeAOIAngles[s][p][sac,:,:]
-
+                else:
+                    # search index of all the not nan values of SaccadeAOIAngles[s][p][sac,:,:]
+                    idxs = np.argwhere(~np.isnan(SaccadeAOIAngles[s][p][sac, :, :]))
+                    if len(idxs) > 0:
+                        for idx in idxs:
+                            v, h = idx
+                            if isinstance(Saccades[s,p,v,h], np.ndarray):
+                                Saccades[s,p,v,h]=np.append(Saccades[s,p,v,h],SaccadeAOIAngles[s][p][sac,v,h])
+                            else:
+                                Saccades[s,p,v,h]=np.array([SaccadeAOIAngles[s][p][sac,v,h]])
+                
+            # store saccades that cross multiple AOI rectangles
             for h in range(nHor):
                 for v in range(nVer):
                     if np.sum(np.isfinite(SaccadeAOIAnglesCross[s][p][:,v,h]))>0:
-                        Saccades[s,p,v,h]=np.array(SaccadeAOIAnglesCross[s][p][~np.isnan(SaccadeAOIAnglesCross[s][p][:,v,h]),v,h])
-                    else:
+                        if isinstance(Saccades[s,p,v,h], np.ndarray):
+                            Saccades[s,p,v,h]=np.append(Saccades[s,p,v,h],SaccadeAOIAnglesCross[s][p][~np.isnan(SaccadeAOIAnglesCross[s][p][:,v,h]),v,h])
+                        else:
+                            Saccades[s,p,v,h]=np.array(SaccadeAOIAnglesCross[s][p][~np.isnan(SaccadeAOIAnglesCross[s][p][:,v,h]),v,h])
+                    elif not isinstance(Saccades[s,p,v,h], np.ndarray):
                         Saccades[s,p,v,h]=np.array([])
+                    
     return Saccades
 
 def SaccadeSingleSel(self, SaccadeObj, nHor, stim, nVer=0, InferS=False): 
@@ -148,19 +161,33 @@ def SaccadeSingleSel(self, SaccadeObj, nHor, stim, nVer=0, InferS=False):
             # Select saccades that cross multiple cells
             if np.sum(SaccadeAOIAngles[s][sac, :, :] > 0) > 1:
                 SaccadeAOIAnglesCross[s][sac, :, :] = SaccadeAOIAngles[s][sac, :, :]
+            else:
+                # search index of all the not nan values of SaccadeAOIAngles[s][p][sac,:,:]
+                idxs = np.argwhere(~np.isnan(SaccadeAOIAngles[s][sac, :, :]))
+                if len(idxs) > 0:
+                    for idx in idxs:
+                        v, h = idx
+                        if isinstance(Saccades[s,v,h], np.ndarray):
+                            Saccades[s,v,h]=np.append(Saccades[s,v,h],SaccadeAOIAngles[s][sac,v,h])
+                        else:
+                            Saccades[s,v,h]=np.array([SaccadeAOIAngles[s][sac,v,h]])
 
-        # Store saccades that cross multiple AOI rectangles
+        # store saccades that cross multiple AOI rectangles
         for h in range(nHor):
             for v in range(nVer):
-                if np.sum(np.isfinite(SaccadeAOIAnglesCross[s][:, v, h])) > 0:
-                    Saccades[s, v, h] = np.array(SaccadeAOIAnglesCross[s][~np.isnan(SaccadeAOIAnglesCross[s][:, v, h]), v, h])
-                else:
-                    Saccades[s, v, h] = np.array([])
+                if np.sum(np.isfinite(SaccadeAOIAnglesCross[s][:,v,h]))>0:
+                    if isinstance(Saccades[s,v,h], np.ndarray):
+                        Saccades[s,v,h]=np.append(Saccades[s,v,h],SaccadeAOIAnglesCross[s][~np.isnan(SaccadeAOIAnglesCross[s][:,v,h]),v,h])
+                    else:
+                        Saccades[s,v,h]=np.array(SaccadeAOIAnglesCross[s][~np.isnan(SaccadeAOIAnglesCross[s][:,v,h]),v,h])
+                elif not isinstance(Saccades[s,v,h], np.ndarray):
+                    Saccades[s,v,h]=np.array([])
+        
     
     return Saccades
 
 
-def SacSim1Group(self,Saccades,Thr=5,p='all',normalize='add',power=1):
+def SacSim1Group(self,Saccades,Thr=5,p='all',normalize='add',method='default',power=1):
     ''' calculate saccade similarity for each stimulus, between each pair of participants ,
     needs saccades stored as PyEyeSim saccade objects stored in AOIs as input,
     vertical and horizontal dimensions are inferred from the input
@@ -184,10 +211,13 @@ def SacSim1Group(self,Saccades,Thr=5,p='all',normalize='add',power=1):
                                 if len(Saccades[s1,p1,v,h])>0 and len(Saccades[s2,p1,v,h])>0:
                                     
                                     if Thr==0:
-                                        SimSacP[s1,s2,p1,v,h]=angle_difference_power(Saccades[s1,p1,v,h],Saccades[s2,p1,v,h],power=power)
-                                        
+                                        if method == 'peak180':
+                                            SimSacP[s1,s2,p1,v,h]=angle_difference_peak180(Saccades[s1,p1,v,h],Saccades[s2,p1,v,h],power=power)
+                                        elif method == 'power':
+                                            SimSacP[s1,s2,p1,v,h]=angle_difference_power(Saccades[s1,p1,v,h],Saccades[s2,p1,v,h],power=power)
+                                        else:
+                                            raise ValueError('Invalid method')
                                     else:          
-                                       
                                         simsacn=CalcSimAlt(Saccades[s1,p1,v,h],Saccades[s2,p1,v,h],Thr=Thr)                       
                                         if normalize=='add':
                                             SimSacP[s1,s2,p1,v,h]=simsacn/(len(Saccades[s1,p1,v,h])+len(Saccades[s2,p1,v,h]))
@@ -197,7 +227,7 @@ def SacSim1Group(self,Saccades,Thr=5,p='all',normalize='add',power=1):
     return SimSacP
 
   
-def SacSim1GroupAll2All(self,Saccades,Thr=5,p='all',normalize='add',power=1):
+def SacSim1GroupAll2All(self,Saccades,Thr=5,p='all',normalize='add',method='true',power=1):
     ''' calculate saccade similarity for each stimulus, and across all stimuli, between each pair of participants ,
     needs saccades stored as PyEyeSim saccade objects stored in AOIs as input,
     vertical and horizontal dimensions are inferred from the input
@@ -222,8 +252,12 @@ def SacSim1GroupAll2All(self,Saccades,Thr=5,p='all',normalize='add',power=1):
                                     if len(Saccades[s1,p1,v,h])>0 and len(Saccades[s2,p2,v,h])>0:
                                         
                                         if Thr==0:
-                                            SimSacP[s1,s2,p1,p2,v,h]=angle_difference_power(Saccades[s1,p1,v,h],Saccades[s2,p2,v,h],power=power)
-
+                                            if method == 'peak180':
+                                                SimSacP[s1,s2,p1,p2,v,h]=angle_difference_peak180(Saccades[s1,p1,v,h],Saccades[s2,p2,v,h],power=power)
+                                            elif method == 'power':
+                                                SimSacP[s1,s2,p1,p2,v,h]=angle_difference_power(Saccades[s1,p1,v,h],Saccades[s2,p2,v,h],power=power)
+                                            else:
+                                                raise ValueError('Invalid method')
                                         else:
                                             simsacn=CalcSimAlt(Saccades[s1,p1,v,h],Saccades[s2,p2,v,h],Thr=Thr)
                                             if normalize=='add':
@@ -255,7 +289,7 @@ def SacSimPipeline(self,divs=[4,5,7,9],Thr=5,InferS=True,normalize='add',power=1
         SimsAll.append(SimSacP)
     return StimSims,np.nanmean(StimSimsInd,0),SimsAll
 
-def SacSimPipelineAll2All(self,divs=[4,5,7,9],Thr=5,InferS=True,normalize='add',power=1):
+def SacSimPipelineAll2All(self,divs=[4,5,7,9],Thr=5,InferS=True,normalize='add',method='default',power=1):
     ''' if Thr>0, threshold based similarity ratio,
     if Thr=0, average saccadic angle difference 
     if Thr=0 and power>1, average saccadic angle difference on the value defined by power
@@ -270,7 +304,7 @@ def SacSimPipelineAll2All(self,divs=[4,5,7,9],Thr=5,InferS=True,normalize='add',
         start_time = time.time()
         print(cd,ndiv)
         sacDivSel=self.SaccadeSel(SaccadeObj,ndiv,InferS=InferS)
-        SimSacP=self.SacSim1GroupAll2All(sacDivSel,Thr=Thr,normalize=normalize,power=power)
+        SimSacP=self.SacSim1GroupAll2All(sacDivSel,Thr=Thr,normalize=normalize,method=method,power=power)
         StimSimsInd[cd,:,:]=np.nanmean(np.nanmean(np.nanmean(SimSacP,5),4),0)
         StimSims[cd,:,:]=np.nanmean(np.nanmean(np.nanmean(np.nanmean(SimSacP,5),4),0),0)
         SimsAll.append(SimSacP)
@@ -278,7 +312,7 @@ def SacSimPipelineAll2All(self,divs=[4,5,7,9],Thr=5,InferS=True,normalize='add',
         print(f"calculating all to all similarity with div {ndiv}*{ndiv} took {end_time - start_time:.3f} sec")
     return StimSims,np.nanmean(StimSimsInd,0),SimsAll
 
-def ScanpathSim2Groups(self,stim,betwcond,nHor=5,nVer=0,inferS=False,Thr=5,normalize='add'):
+def ScanpathSim2Groups(self,stim,betwcond,nHor=5,nVer=0,inferS=False,Thr=0,normalize='add', method='default', power=1):
     if hasattr(self,'subjects')==0:
         self.GetParams()  
     SaccadeObj=self.GetSaccades()
@@ -294,7 +328,7 @@ def ScanpathSim2Groups(self,stim,betwcond,nHor=5,nVer=0,inferS=False,Thr=5,norma
         nVer=nHor  #
     
     SaccadeDiv=self.SaccadeSel(SaccadeObj,nHor=nHor,nVer=nVer,InferS=inferS)    
-    SimSacP=self.SacSim1Group(SaccadeDiv,Thr=Thr,normalize=normalize)
+    SimSacP=self.SacSim1Group(SaccadeDiv,Thr=Thr,normalize=normalize, method=method, power=power)
     WhichC,WhichCN=self.GetGroups(betwcond)
     Idxs=[]
    
@@ -385,4 +419,56 @@ def ScanpathSimSubject2Subject(self, stim, nHor=5, nVer=0, inferS=False, Thr=5, 
 
     return SimSacP,SimVals,SimValsSD
 
+def ScanpathSimSubj2Groups(self, stim, betwcond, subjects, nHor=5, nVer=0, inferS=False, Thr=0, normalize='add', method='default', power=1):
+    if not hasattr(self, 'subjects'):
+        self.GetParams()  
+    if nVer == 0:
+        nVer = nHor
+    if not isinstance(subjects, list):
+        if isinstance(subjects, int):
+            subjects = [subjects]
+        else:
+            raise ValueError('Invalid subjects')
+    
+    SaccadeObj = self.GetSaccades()
+    Saccades = self.SaccadeSingleSel(SaccadeObj, nHor=nHor, stim=stim, nVer=nVer, InferS=inferS)
+    _, WhichCN = self.GetGroups(betwcond)
+    
+    # Get unique conditions
+    condition = np.unique(WhichCN)
+    # Initialize SimVals as a list of lists to hold concatenated values
+    SimVals = [[[] for _ in range(len(condition))] for _ in range(len(subjects))]
 
+    # If we give all subjects as input, we dont need to check that s2 is not in subjects (ie we need to test all subjects)
+    # Otherwise we need to check that s2 is not in the (test) subjects
+    # In this way we ensure to split the data in training and test set
+    if len(subjects) == self.ns:
+        s = []
+    else:
+        s = subjects
+    
+    # Calculate similarity between subjects of different groups and the selected subject
+    for s1_idx, s1 in enumerate(subjects):
+        for s2 in range(self.ns):
+            if s1 != s2 and s2 not in s:
+                tot_val = []
+                for h in range(nHor):
+                    for v in range(nVer):
+                        if len(Saccades[s1, v, h]) > 0 and len(Saccades[s2, v, h]) > 0:
+                            group = WhichCN[s2]
+                            if Thr == 0:
+                                if method == 'peak180':
+                                    val = angle_difference_peak180(Saccades[s1, v, h], Saccades[s2, v, h], power=power)
+                                elif method == 'power':
+                                    val = angle_difference_power(Saccades[s1, v, h], Saccades[s2, v, h], power=power)
+                                else:
+                                    raise ValueError('Invalid method')
+                            else:
+                                simsacn = CalcSimAlt(Saccades[s1, v, h], Saccades[s2, v, h], Thr=Thr)
+                                if normalize == 'add':
+                                    val = simsacn / (len(Saccades[s1, v, h]) + len(Saccades[s2, v, h]))
+                                elif normalize == 'mult':
+                                    val = simsacn / (len(Saccades[s1, v, h]) * len(Saccades[s2, v, h]))
+                            tot_val.append(val)
+                SimVals[s1_idx][group].append(np.nanmean(tot_val))
+    return SimVals

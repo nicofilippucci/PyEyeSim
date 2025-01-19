@@ -261,9 +261,7 @@ def VisHeatmap(self,Stim,smap,ax=0,cutoff=0,alpha=.5,cmap='plasma',cbar=False,cb
    
     return
 
-
-def VisSimmat(self,simdat,title='', stimuli=None, negative=False):
-
+def VisSimmat(self,simdat,ax=0,title='', stimuli=None, negative=False):
     if stimuli is None:
         stimuli=self.stimuli
 
@@ -321,11 +319,18 @@ def VisSimmatScaled(self,simdat,title='', stimuli=None, negative=False):
 def Vis_Saccade_Angles(self,stim,subj='all',color='darkgreen',width= np.pi / 25,binsize=10):
     if hasattr(self,'saccadeangles')==False:
         self.GetSaccades()
+    if subj!='all' and type(subj)!=list:
+        subj=[subj]
     stimn=int(np.nonzero(self.stimuli==stim)[0])
     binss=np.arange(0,360+binsize,binsize)
     
-    saccarray=np.concatenate((self.saccadeangles[:,stimn]))  #self.stimuli==stim]
-
+    if subj=='all':
+        saccarray=np.concatenate((self.saccadeangles[:,stimn]))  #self.stimuli==stim]
+    else:
+        saccarray=np.array([])
+        for s in subj:
+            saccarray=np.concatenate((saccarray,self.saccadeangles[s, stimn]))
+        
     bincounts, edges=np.histogram(saccarray,bins=binss)
 
     ax=plt.subplot(projection='polar')

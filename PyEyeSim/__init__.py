@@ -95,7 +95,8 @@ class EyeData:
         ScanpathSim2Groups,
         SacSimPipelineAll2All,
         SacSim1GroupAll2All,
-        ScanpathSimSubject2Subject
+        ScanpathSimSubject2Subject,
+        ScanpathSimSubj2Groups
         
     )
     from .hmmanalysis import (
