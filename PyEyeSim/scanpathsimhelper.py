@@ -154,6 +154,17 @@ def CalcSimAlt(saccades1,saccades2,Thr=5):
 #     B=saccades2[np.newaxis,:]
 #     return  np.mean(((A-B)/180)**2)
 
+def KuiperStat(saccades1,saccades2):
+    sample1 = np.sort(saccades1)
+    sample2 = np.sort(saccades2)
+    all_data = np.sort(np.concatenate((sample1, sample2)))
+    ecdf1 = np.searchsorted(sample1, all_data, side='right') / len(sample1)
+    ecdf2 = np.searchsorted(sample2, all_data, side='right') / len(sample2)
+    d_plus = np.max(ecdf1 - ecdf2)
+    d_minus = np.max(ecdf2 - ecdf1)
+    v = d_plus + d_minus
+    return 1 - v
+
 def angle_difference_power(saccades1,saccades2,power=1):
     ''' this methods calculates differences between 0 and 90 degrees, between all pairs of saccades, than normalizes to the range 0-1, than averages
     by default it is just the mean absolute difference, but can be used for different exponentials by changing power from the default of 1'''
@@ -163,14 +174,56 @@ def angle_difference_power(saccades1,saccades2,power=1):
     return np.mean(np.abs((np.minimum(diffs, 180 - diffs)/90))**power)
 
 
-def angle_difference_peak180(saccades1, saccades2, power=1):
+def angle_difference_peak180(saccades1, saccades2, power=1, match=False):
     """
     Calculates differences between 0 and 180 degrees, with a peak of 1 at 180 degrees.
     Normalizes to the range 0–1, with a decrease back to 0 after 180 degrees.
     Allows for custom exponentials via the `power` parameter.
+    
+    If `matching` is True, calculates the difference between the two saccade arrays
+    based on the array order, penalizing extra saccades.
+    
+    Parameters:
+        saccades1: np.ndarray
+            A 1D array of saccade angles in degrees.
+        saccades2: np.ndarray
+            A 1D array of saccade angles in degrees.
+        power: int or float
+            The exponent applied to the similarity values. Defaults to 1.
+        matching: bool
+            If True, matches saccades based on minimum differences, penalizing extras.
+    
+    Returns:
+        float: The mean similarity score, normalized between 0 and 1.
     """
-    diffs = np.abs(saccades1[:, np.newaxis] - saccades2) % 360
-    diffs = np.minimum(diffs, 360 - diffs) 
-    normalized_diffs = (np.abs(diffs) / 180) 
-    symmetric_diffs = 1 - np.abs(1 - normalized_diffs) 
-    return np.mean(symmetric_diffs**power)
+    if match:
+        # Calculate differences between saccades with a matching penalty for extras
+        matched_diffs = []
+        saccades2_used = np.zeros(len(saccades2), dtype=bool)
+
+        for angle1 in saccades1:
+            diffs = np.abs(angle1 - saccades2) % 360
+            diffs = np.minimum(diffs, 360 - diffs)  # Handle circularity
+            # Find the closest match in saccades2
+            min_diff_idx = np.argmin(diffs)
+            if not saccades2_used[min_diff_idx]:
+                saccades2_used[min_diff_idx] = True
+                matched_diffs.append(diffs[min_diff_idx])
+            else:
+                matched_diffs.append(180)  # Penalize unmatched saccades
+        
+        # Penalize remaining unmatched saccades in saccades2
+        unmatched_penalty = [180] * (len(saccades2) - np.sum(saccades2_used))
+        matched_diffs.extend(unmatched_penalty)
+
+        normalized_diffs = np.array(matched_diffs) / 180
+        symmetric_diffs = 1 - np.abs(1 - normalized_diffs)
+        similarity_score = np.mean(symmetric_diffs**power)
+    else:
+        diffs = np.abs(saccades1[:, np.newaxis] - saccades2) % 360
+        diffs = np.minimum(diffs, 360 - diffs) 
+        normalized_diffs = (np.abs(diffs) / 180) 
+        symmetric_diffs = 1 - np.abs(1 - normalized_diffs) 
+        similarity_score = np.mean(symmetric_diffs**power)
+    
+    return similarity_score

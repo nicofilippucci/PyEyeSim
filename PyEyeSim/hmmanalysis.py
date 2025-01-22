@@ -97,7 +97,7 @@ def get_data(self, stim, group=-1, tolerance=20, subject=-1, remove_subj=False):
         The list of fixation lengths for each subject.
     """
 
-    XX, YY, list_lengths = self.DataArrayHmm(stim, group, tolerance=tolerance, verb=False)
+    XX, YY, list_lengths,_ = self.DataArrayHmm(stim, group, tolerance=tolerance, verb=False)
     if subject != -1:
         if isinstance(subject, int):
             subject = [subject]

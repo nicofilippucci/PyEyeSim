@@ -95,7 +95,7 @@ class SaccadeLine:
     def Coords(self):   
         return self.x1,self.y1,self.x2,self.y2
     def length(self):   # length of saccade
-        return int(np.sqrt((self.x2-self.x1)**2+(self.y2-self.y1)**2))
+        return np.sqrt((self.x2-self.x1)**2+(self.y2-self.y1)**2)
     
     def lengthHor(self):  # horizontal length of saccade
         return  np.abs(self.x2-self.x1)
@@ -113,8 +113,8 @@ class SaccadeLine:
         return
     
     def LinePoints(self):  # use dots with density of 1dot/1pixel to approximate line.
-        LineX=np.linspace(self.x1,self.x2,self.length())
-        LineY=np.linspace(self.y1,self.y2,self.length())
+        LineX=np.linspace(self.x1,self.x2,int(self.length()))
+        LineY=np.linspace(self.y1,self.y2,int(self.length()))
         return LineX,LineY
     
 
