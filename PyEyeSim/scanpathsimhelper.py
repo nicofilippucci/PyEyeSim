@@ -1,6 +1,6 @@
 
 import numpy as np
-from numpy import matlib
+from numpy import mat, matlib
 #from scipy import stats,ndimage
 #import pandas as pd
 import matplotlib.pyplot as plt
@@ -121,7 +121,7 @@ class SaccadeLine:
         return LineX,LineY
     
 
-def CalcSim(saccades1,saccades2,Thr=5, method='default', power=1):
+def CalcSim(saccades1,saccades2,Thr=5, method='default', power=1, match=False):
     ''' calculcate angle based similarity for two arrays of saccade objects (for each cell)'''
     if method=='default':
         saccades1[saccades1>180]-=180
@@ -133,7 +133,9 @@ def CalcSim(saccades1,saccades2,Thr=5, method='default', power=1):
     elif method=='power':
         return angle_difference_power(saccades1, saccades2, power=power)
     elif method=='peak180':
-        return angle_difference_peak180(saccades1, saccades2, power=power)
+        return angle_difference_peak180(saccades1, saccades2, power=power, match=match)
+    elif method=='Kuiper':
+        return KuiperStat(saccades1, saccades2)
     else:
         raise ValueError('Invalid method: {}'.format(method))
 

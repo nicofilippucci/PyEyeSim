@@ -389,7 +389,7 @@ def ScanpathSim2Groups(self,stim,betwcond,nHor=5,nVer=0,inferS=False,Thr=0,norma
     
     return SimVals,SimValsSD
 
-def ScanpathSimSubject2Subject(self, stim, nHor=5, nVer=0, inferS=False, Thr=5, normalize='add', method='default'):
+def ScanpathSimSubject2Subject(self, stim, nHor=5, nVer=0, inferS=False, Thr=5, normalize='add', method='default', match=False):
     '''
     Calculate saccade similarity for a specific stimulus, between each pair of participants.
 
@@ -441,7 +441,7 @@ def ScanpathSimSubject2Subject(self, stim, nHor=5, nVer=0, inferS=False, Thr=5, 
                     for h in range(nHor):
                         for v in range(nVer):
                             if len(Saccades[s1,v,h])>0 and len(Saccades[s2,v,h])>0:                     
-                                simsacn=CalcSim(Saccades[s1,v,h],Saccades[s2,v,h],Thr=Thr,method=method)
+                                simsacn=CalcSim(Saccades[s1,v,h],Saccades[s2,v,h],Thr=Thr,method=method, match=match)
                                 if method == 'default':
                                     if normalize=='add':
                                         SimSacP[s1,s2,v,h]=simsacn/(len(Saccades[s1,v,h])+len(Saccades[s2,v,h]))
