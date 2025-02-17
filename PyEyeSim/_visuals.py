@@ -261,7 +261,7 @@ def VisHeatmap(self,Stim,smap,ax=0,cutoff=0,alpha=.5,cmap='plasma',cbar=False,cb
    
     return
 
-def VisSimmat(self,simdat,ax=0,title='', stimuli=None, negative=False):
+def VisSimmat(self,simdat,ax=0,title='', stimuli=None, negative=False, matcheck=True):
     if stimuli is None:
         stimuli=self.stimuli
 
@@ -270,10 +270,11 @@ def VisSimmat(self,simdat,ax=0,title='', stimuli=None, negative=False):
     cols=ax.pcolor(simdat)
     ax.set_xticks(np.arange(len(stimuli))+.5,stimuli,rotation=50)
     ax.set_yticks(np.arange(len(stimuli))+.5,stimuli) #,rotation=50)
-    if negative:
-        ax.scatter(np.arange(len(stimuli))+.5,np.argmin(simdat,0)+.5,color='r')
-    else:
-        ax.scatter(np.arange(len(stimuli))+.5,np.argmax(simdat,1)+.5,color='r')
+    if matcheck:
+        if negative:
+            ax.scatter(np.arange(len(stimuli))+.5,np.argmin(simdat,0)+.5,color='r')
+        else:
+            ax.scatter(np.arange(len(stimuli))+.5,np.argmax(simdat,1)+.5,color='r')
     plt.colorbar(cols,ax=ax)
     ax.set_title(title)
 
@@ -291,7 +292,7 @@ def VisHMMSimmat(self,simdat,title='', stimuli=None):
     plt.colorbar(cols,ax=ax)
     ax.set_title(title)
 
-def VisSimmatScaled(self,simdat,title='', stimuli=None, negative=False):
+def VisSimmatScaled(self,simdat,title='', stimuli=None, negative=False, matcheck=True):
 
     if stimuli is None:
         stimuli=self.stimuli
@@ -303,15 +304,11 @@ def VisSimmatScaled(self,simdat,title='', stimuli=None, negative=False):
     cols = ax.pcolor(simdat, vmin=vmin, vmax=vmax)
     ax.set_xticks(np.arange(len(stimuli))+.5,stimuli,rotation=50)
     ax.set_yticks(np.arange(len(stimuli))+.5,stimuli) #,rotation=50)
-    if negative:
-        ax.scatter(np.arange(len(stimuli))+.5,np.argmin(simdat,0)+.5,color='r')
-    else:
-        ax.scatter(np.arange(len(stimuli))+.5,np.argmax(simdat,1)+.5,color='r')
-    plt.colorbar(cols,ax=ax)
-    ax.set_title(title)
-    ax.set_xticks(np.arange(self.np)+.5,self.stimuli,rotation=70)
-    ax.set_yticks(np.arange(self.np)+.5,self.stimuli) #,rotation=50)
-    ax.scatter(np.arange(self.np)+.5,np.argmax(simdat,1)+.5,color='r')
+    if matcheck:
+        if negative:
+            ax.scatter(np.arange(len(stimuli))+.5,np.argmin(simdat,0)+.5,color='r')
+        else:
+            ax.scatter(np.arange(len(stimuli))+.5,np.argmax(simdat,1)+.5,color='r')
     plt.colorbar(cols,ax=ax)
     ax.set_title(title)
     

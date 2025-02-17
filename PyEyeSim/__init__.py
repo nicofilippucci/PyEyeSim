@@ -23,7 +23,7 @@ class EyeData:
     from ._dataproc import GetParams,GetStimuli,GetFixationData,GetDurations,GetGroups,GetCats,GetSaccades,GetEntropies,InferSize,Heatmap,FixCountCalc,GetStimSubjMap
     from ._stats import AngleCalc,AngtoPix,PixdoDeg,Entropy,FixDurProg,BinnedCount,GetInddiff,GetInddiff_v2,RunDiffDivs,GetBinnedStimFixS,StatPDiffInd2,StatPDiffInd1,CalcStatPs,CalcRets,CalcImmRets,BinnedDescriptives
     from ._comparegroups import CompareGroupsFix,CompareWithinGroupsFix,FixDurProgGroups,BinnedDescriptivesGroups,CompareGroupsMat,CompareGroupsGridFix,CompareStimHeatmap,CompareStimGridFix
-    from ._scanpathsim import AOIFix,SacSimPipeline,SacSim1Group,SaccadeSel,ScanpathSim2Groups,SacSimSubj2Group
+    from ._scanpathsim import AOIFix,SacSimPipeline,SacSim1Group,SaccadeSel,ScanpathSim2Groups,SacSimSubj2Group,SacSimSubj2GroupPlusFeature
     from .hmmanalysis import GaussianHMMPipeline,models_pipeline,calculate_starting_likelihood,likelihood_matrix,plot_pipeline,plot_models_summary,plot_likelihood_matrix,plot_simulated_data,plot_starting_likelihood,calculate_best_model,calculate_entropy,score_calculation,fishers_score_regularized,normalize_scores,best_models,min_max_avg,models_fit,model_def,data_simulation,fixation_sequence,get_data
 
 class EyeData:
@@ -98,7 +98,8 @@ class EyeData:
         ScanpathSimSubject2Subject,
         ScanpathSimSubj2Groups,
         SacSim2GroupAll2All,
-        SacSimSubj2Group
+        SacSimSubj2Group,
+        SacSimSubj2GroupPlusFeature
     )
     from .hmmanalysis import (
         GaussianHMMPipeline,

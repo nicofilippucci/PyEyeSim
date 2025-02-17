@@ -5,8 +5,10 @@ Created on Thu Jan 25 17:54:38 2024
 @author: aratoj87
 """
 
+from math import e
+from re import S
 import numpy as np
-from numpy import matlib
+from numpy import cross, matlib, std
 from scipy import stats,ndimage
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -514,7 +516,7 @@ def ScanpathSimSubj2Groups(self, stim, betwcond, subjects, nHor=5, nVer=0, infer
                 SimVals[s1_idx][group].append(np.nanmean(tot_val))
     return SimVals
 
-def SacSimSubj2Group(self, Saccades, WhichCN, subjects, Thr=0, normalize='add', method='default', power=1, match=False):
+def SacSimSubj2Group(self, Saccades, WhichCN, subjects, Thr=0, normalize='add', method='default', power=1, match=False, nosubj=[], SingleROI=False):
     if not hasattr(self, 'subjects'):
         self.GetParams()
     if not isinstance(subjects, list):
@@ -530,15 +532,20 @@ def SacSimSubj2Group(self, Saccades, WhichCN, subjects, Thr=0, normalize='add', 
     condition = np.unique(WhichCN)
     # Initialize SimVals as a list of lists to hold concatenated values
     SimVals = [[[] for _ in range(len(condition))] for _ in range(len(subjects))]
+    if SingleROI:
+        # Initialize SimValsROI for storing similarity values for each ROI (nVer x nHor)
+        SimValsROI = [[[[np.nan for _ in range(nHor)] for _ in range(nVer)] for _ in range(len(condition))] for _ in range(len(subjects))]
 
     # If we give all subjects as input, we dont need to check that s2 is not in subjects (ie we need to test all subjects)
     # Otherwise we need to check that s2 is not in the (test) subjects
     # In this way we ensure to split the data in training and test set
-    if len(subjects) == self.ns:
+    if len(subjects) == self.ns and len(nosubj) == 0:
         s = []
+    elif len(nosubj) > 0:
+        s = nosubj
     else:
         s = subjects
-    
+
     # Calculate similarity between subjects of different groups and the selected subject
     for s1_idx, s1 in enumerate(subjects):
         for s2 in range(self.ns):
@@ -563,6 +570,196 @@ def SacSimSubj2Group(self, Saccades, WhichCN, subjects, Thr=0, normalize='add', 
                                     val = simsacn / (len(Saccades[s1, v, h]) + len(Saccades[s2, v, h]))
                                 elif normalize == 'mult':
                                     val = simsacn / (len(Saccades[s1, v, h]) * len(Saccades[s2, v, h]))
+                            if SingleROI:
+                                if isinstance(SimValsROI[s1_idx][group][v][h], np.ndarray):
+                                    SimValsROI[s1_idx][group][v][h] = np.append(SimValsROI[s1_idx][group][v][h], val)
+                                else:
+                                    SimValsROI[s1_idx][group][v][h] = np.array([val])
                             tot_val.append(val)
                 SimVals[s1_idx][group].append(np.nanmean(tot_val))
-    return SimVals
+
+    if SingleROI:
+        return SimVals, SimValsROI
+    else:
+        return SimVals
+    
+
+def SacSimSubj2GroupPlusFeature(self, stim, WhichCN, subjects, nHor=5, nVer=0, inferS=False, Thr=0, normalize='add', method='default', power=1, match=False, nosubj=[]):
+    if not hasattr(self, 'subjects'):
+        self.GetParams()
+    if nVer == 0:
+        nVer = nHor
+    if not isinstance(subjects, list):
+        if isinstance(subjects, int):
+            subjects = [subjects]
+        else:
+            raise ValueError('Invalid subjects')
+        
+    def SaccadeAndFeatures(self, SaccadeObj, nHor, stim, nVer=0, InferS=False):
+        if nVer == 0:
+            nVer = nHor  # if number of vertical divisions not provided, use same as horizontal
+
+        SaccadeAOIAngles = []   # store angles per saccade per ROI cell (even if the saccade crosses multiple cells)
+        SaccadeAOIAnglesCross = []  # for saccades that cross >1 ROI
+
+        # Create AOI rectangles. Here we assume CreatAoiRects returns a nested structure,
+        # e.g., AOIRects[stim][h][v] is an AOI rectangle object that has a .Cross(LinePoints) method.
+        if InferS:
+            if not hasattr(self, 'boundsX'):
+                print('Running descriptives to get bounds')
+                self.RunDescriptiveFix()  
+            AOIRects = CreatAoiRects(nHor, nVer, self.boundsX, self.boundsY)
+        else:
+            AOIRects = CreatAoiRects(nHor, nVer, self.x_size, self.y_size, allsame=self.np)
+
+        ns = self.ns  
+
+        # Also, we will accumulate the corresponding lengths per cell
+        TotAOICrossing = np.empty((ns, nVer, nHor), dtype=object)
+        for s in range(ns):
+            for v in range(nVer):
+                for h in range(nHor):
+                    TotAOICrossing[s, v, h] = []
+
+        Saccades = np.zeros(((ns, nVer, nHor)), dtype=np.ndarray)  # Array of saccades crossing each AOI rectangle for each trial and participant
+        for s in np.arange(self.ns):
+            SaccadeAOIAngles.append(np.zeros((int(self.nsac[s, stim]), nVer, nHor)))
+            SaccadeAOIAngles[s][:] = np.nan
+            SaccadeAOIAnglesCross.append(np.zeros((int(self.nsac[s, stim]), nVer, nHor)))
+            SaccadeAOIAnglesCross[s][:] = np.nan
+            
+            for sac in range(len(SaccadeObj[s][stim])):
+                SaccadeDots = SaccadeObj[s][stim][sac].LinePoints()
+                
+                for h in range(nHor):
+                    for v in range(nVer):
+                        if AOIRects[stim][h][v].Cross(SaccadeDots):
+                            SaccadeAOIAngles[s][sac, v, h] = SaccadeObj[s][stim][sac].Angle()  # Get angle of the saccade
+                        
+                # Select saccades that cross multiple cells
+                if np.sum(SaccadeAOIAngles[s][sac, :, :] > 0) > 1:
+                    SaccadeAOIAnglesCross[s][sac, :, :] = SaccadeAOIAngles[s][sac, :, :]
+                else:
+                    # search index of all the not nan values of SaccadeAOIAngles[s][p][sac,:,:]
+                    idxs = np.argwhere(~np.isnan(SaccadeAOIAngles[s][sac, :, :]))
+                    if len(idxs) > 0:
+                        for idx in idxs:
+                            v, h = idx
+                            if isinstance(Saccades[s,v,h], np.ndarray):
+                                Saccades[s,v,h]=np.append(Saccades[s,v,h],SaccadeAOIAngles[s][sac,v,h])
+                            else:
+                                Saccades[s,v,h]=np.array([SaccadeAOIAngles[s][sac,v,h]])
+
+            # store saccades that cross multiple AOI rectangles
+            for h in range(nHor):
+                for v in range(nVer):
+                    if np.sum(np.isfinite(SaccadeAOIAnglesCross[s][:,v,h]))>0:
+                        # save number of crossings saccades for each cell
+                        TotAOICrossing[s, v, h] = np.sum(np.isfinite(SaccadeAOIAnglesCross[s][:,v,h]))
+                        if isinstance(Saccades[s,v,h], np.ndarray):
+                            Saccades[s,v,h]=np.append(Saccades[s,v,h],SaccadeAOIAnglesCross[s][~np.isnan(SaccadeAOIAnglesCross[s][:,v,h]),v,h])
+                        else:
+                            Saccades[s,v,h]=np.array(SaccadeAOIAnglesCross[s][~np.isnan(SaccadeAOIAnglesCross[s][:,v,h]),v,h])
+                    elif not isinstance(Saccades[s,v,h], np.ndarray):
+                        Saccades[s,v,h]=np.array([])
+
+        Features = np.empty((ns, nVer, nHor), dtype=object)
+        for s in range(ns):
+            for v in range(nVer):
+                for h in range(nHor):
+                    angles = np.array(Saccades[s, v, h])
+                    
+                    # Mean and STD for angles (if there is any data)
+                    if angles.size > 0:
+                        mean_angle = np.nanmean(angles)
+                        std_angle = np.nanstd(angles)
+                    else:
+                        mean_angle = np.nan
+                        std_angle = np.nan
+
+                    # Count of fixations/saccades that touched the cell
+                    fixation_count = angles.size
+
+                    # Count of saccades that crossed multiple cells
+                    cross_angles = TotAOICrossing[s, v, h]
+
+                    Features[s, v, h] = {'mean_angle': mean_angle,
+                                         'std_angle': std_angle,
+                                         'fixation_count': fixation_count,
+                                         'cross_angles': cross_angles
+                                         }
+                    
+        return Saccades, Features
+    
+    SaccadeObj = self.GetSaccades()
+    Saccades, Features = SaccadeAndFeatures(self, SaccadeObj, nHor=nHor, stim=stim, nVer=nVer, InferS=inferS)
+    
+    # Get unique conditions
+    condition = np.unique(WhichCN)
+    # Initialize SimVals as a list of lists to hold concatenated values
+    SimVals = [[[] for _ in range(len(condition))] for _ in range(len(subjects))]
+    SimValsROI = [[[[np.nan for _ in range(nHor)] for _ in range(nVer)] for _ in range(len(condition))] for _ in range(len(subjects))]
+
+
+    # If we give all subjects as input, we dont need to check that s2 is not in subjects (ie we need to test all subjects)
+    # Otherwise we need to check that s2 is not in the (test) subjects
+    # In this way we ensure to split the data in training and test set
+    if len(subjects) == self.ns and len(nosubj) == 0:
+        s = []
+    elif len(nosubj) > 0:
+        s = nosubj
+    else:
+        s = subjects
+        
+    # Calculate similarity between subjects of different groups and the selected subject
+    for s1_idx, s1 in enumerate(subjects):
+        for s2 in range(self.ns):
+            if s1 != s2 and s2 not in s:
+                tot_val = []
+                for h in range(nHor):
+                    for v in range(nVer):
+                        if len(Saccades[s1, v, h]) > 0 and len(Saccades[s2, v, h]) > 0:
+                            group = WhichCN[s2]
+                            if Thr == 0:
+                                if method == 'peak180':
+                                    val = angle_difference_peak180(Saccades[s1, v, h], Saccades[s2, v, h], power=power, match=match)
+                                elif method == 'power':
+                                    val = angle_difference_power(Saccades[s1, v, h], Saccades[s2, v, h], power=power)
+                                elif method == 'Kuiper':
+                                    val = KuiperStat(Saccades[s1, v, h], Saccades[s2, v, h])
+                                else:
+                                    raise ValueError('Invalid method')
+                            else:
+                                print()
+                                simsacn = CalcSimAlt(Saccades[s1, v, h], Saccades[s2, v, h], Thr=Thr)
+                                if normalize == 'add':
+                                    val = simsacn / (len(Saccades[s1, v, h]) + len(Saccades[s2, v, h]))
+                                elif normalize == 'mult':
+                                    val = simsacn / (len(Saccades[s1, v, h]) * len(Saccades[s2, v, h]))
+                            if isinstance(SimValsROI[s1_idx][group][v][h], np.ndarray):
+                                SimValsROI[s1_idx][group][v][h] = np.append(SimValsROI[s1_idx][group][v][h], val)
+                            else:
+                                SimValsROI[s1_idx][group][v][h] = np.array([val])
+                            tot_val.append(val)
+                SimVals[s1_idx][group].append(np.nanmean(tot_val))
+
+    SimAndFeatureVals = np.empty((len(subjects), nVer, nHor), dtype=object)
+    for s1_idx, s1 in enumerate(subjects):
+        for v in range(nVer):
+            for h in range(nHor):
+                feature_val = Features[s1, v, h]
+                mean_g0 = np.nanmean(SimValsROI[s1_idx][0][v][h])
+                std_g0 = np.nanstd(SimValsROI[s1_idx][0][v][h])
+                mean_g1 = np.nanmean(SimValsROI[s1_idx][1][v][h])
+                std_g1 = np.nanstd(SimValsROI[s1_idx][1][v][h])
+                SimAndFeatureVals[s1_idx][v][h] = [feature_val['fixation_count'],
+                                                   feature_val['mean_angle'] if not np.isnan(feature_val['mean_angle']) else 0, 
+                                                   feature_val['std_angle'] if not np.isnan(feature_val['std_angle']) else 0,
+                                                   feature_val['cross_angles'] if not feature_val['cross_angles'] == [] else 0,
+                                                   mean_g0 if not np.isnan(mean_g0) else 0,
+                                                   mean_g1 if not np.isnan(mean_g1) else 0,
+                                                   std_g0 if not np.isnan(std_g0) else 0,
+                                                   std_g1 if not np.isnan(std_g1) else 0
+                                                   ]
+
+    return SimAndFeatureVals

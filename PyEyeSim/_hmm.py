@@ -277,8 +277,8 @@ def HMMSimPipelineAll2All(self,ncomp=4,verb=False,covar='full',ntest=3, n_iter=1
                 StimSimsHMMTrain[cp2,cp1]=HMMfitted.score(DatsTrain[stim2],DatsTrainL[stim2])/np.sum(DatsTrainL[stim2])
                 StimSimsHMMTest[cp2,cp1]=HMMfitted.score(DatsTest[stim2],DatsTestL[stim2])/np.sum(DatsTestL[stim2])
 
-    self.VisSimmat(StimSimsHMMTrain,'Train', stimuli, negative=bic)
-    self.VisSimmat(StimSimsHMMTest,'Test', stimuli, negative=bic)
+    self.VisSimmat(StimSimsHMMTrain,ax=0,title='Train', stimuli=stimuli, negative=bic)
+    self.VisSimmat(StimSimsHMMTest,ax=0,title='Test', stimuli=stimuli, negative=bic)
     
     return StimSimsHMMTrain,StimSimsHMMTest
 
@@ -553,7 +553,7 @@ def HMMSimPiepelineModel2ModelOpt(self, ncomp=4, verb=False, covar='full', n_ite
     return StimSimsHMM
 
 
-def HMMSimPipelineSubject2Subject(self, stim=1, ncomp=4,verb=False,covar='full', n_iter=100, iter=1, subj=-1, vis='default'):
+def HMMSimPipelineSubject2Subject(self, stim=1, ncomp=4,verb=False,covar='full', n_iter=100, iter=1, subj=-1, vis='default', matcheck=True):
     ''' 
     Compare the similarity between subjects for a given stimulus using HMM.
     '''
@@ -604,9 +604,9 @@ def HMMSimPipelineSubject2Subject(self, stim=1, ncomp=4,verb=False,covar='full',
             StimSimsHMM[cp2,cp1]=HMMfitted.score(Dat2, subjects[cp2])/ subjects[cp2]
 
     if vis=='default':
-        self.VisSimmat(StimSimsHMM, title='Subject 2 Subject', stimuli=[indx for indx,_ in enumerate(subjects)])
+        self.VisSimmat(StimSimsHMM, title='Subject 2 Subject', stimuli=[indx for indx,_ in enumerate(subjects)], matcheck=matcheck)
     elif vis=='scaled':
-        self.VisSimmatScaled(StimSimsHMM,'Subject 2 Subject', [indx for indx,_ in enumerate(subjects)])
+        self.VisSimmatScaled(StimSimsHMM,'Subject 2 Subject', [indx for indx,_ in enumerate(subjects)], matcheck=matcheck)
     
     return StimSimsHMM
 
