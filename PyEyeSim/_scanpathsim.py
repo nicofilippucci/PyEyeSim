@@ -513,7 +513,8 @@ def ScanpathSimSubj2Groups(self, stim, betwcond, subjects, nHor=5, nVer=0, infer
                                 elif normalize == 'mult':
                                     val = simsacn / (len(Saccades[s1, v, h]) * len(Saccades[s2, v, h]))
                             tot_val.append(val)
-                SimVals[s1_idx][group].append(np.nanmean(tot_val))
+                    if len(tot_val) > 0:
+                        SimVals[s1_idx][group].append(np.nanmean(tot_val))
     return SimVals
 
 def SacSimSubj2Group(self, Saccades, WhichCN, subjects, Thr=0, normalize='add', method='default', power=1, match=False, nosubj=[], SingleROI=False):
