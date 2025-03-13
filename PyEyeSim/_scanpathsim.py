@@ -13,13 +13,9 @@ from scipy import stats,ndimage
 import pandas as pd
 import matplotlib.pyplot as plt
 import time
-from .scanpathsimhelper import AOIbounds,CreatAoiRects,Rect,SaccadeLine,CalcSim, CheckCoor,CalcSimAlt,angle_difference_power, angle_difference_peak180, KuiperStat
 
-
-
-
-
-
+from sympy import Si
+from .scanpathsimhelper import AOIbounds,CreatAoiRects,Rect,SaccadeLine,CalcSim, CheckCoor,CalcSimAlt,angle_difference_power, angle_difference_peak180, KuiperStat, CosineSim
 
 def AOIFix(self,p,FixTrialX,FixTrialY,nDivH,nDivV,InferS=1):
     """ given a sequence of X,Y fixation data and AOI divisions, calculate static N and p matrix) """ 
@@ -221,13 +217,15 @@ def SacSim1Group(self,Saccades,Thr=5,p='all',normalize='add',method='default',po
                                             SimSacP[s1,s2,p1,v,h]=KuiperStat(Saccades[s1,p1,v,h],Saccades[s2,p1,v,h])
                                         else:
                                             raise ValueError('Invalid method')
-                                    else:          
-                                        simsacn=CalcSimAlt(Saccades[s1,p1,v,h],Saccades[s2,p1,v,h],Thr=Thr)                       
-                                        if normalize=='add':
-                                            SimSacP[s1,s2,p1,v,h]=simsacn/(len(Saccades[s1,p1,v,h])+len(Saccades[s2,p1,v,h]))
-                                        elif normalize=='mult':
-                                            SimSacP[s1,s2,p1,v,h]=simsacn/(len(Saccades[s1,p1,v,h])*len(Saccades[s2,p1,v,h]))
- 
+                                    else:
+                                        if method == 'default':  
+                                            simsacn=CalcSimAlt(Saccades[s1,p1,v,h],Saccades[s2,p1,v,h],Thr=Thr)                       
+                                            if normalize=='add':
+                                                SimSacP[s1,s2,p1,v,h]=simsacn/(len(Saccades[s1,p1,v,h])+len(Saccades[s2,p1,v,h]))
+                                            elif normalize=='mult':
+                                                SimSacP[s1,s2,p1,v,h]=simsacn/(len(Saccades[s1,p1,v,h])*len(Saccades[s2,p1,v,h]))
+                                        elif method == 'cosine':
+                                            SimSacP[s1,s2,p1,v,h]=CosineSim(Saccades[s1,p1,v,h],Saccades[s2,p1,v,h], Thr=Thr)
     return SimSacP
 
   
@@ -265,11 +263,14 @@ def SacSim1GroupAll2All(self,Saccades,Thr=5,p='all',normalize='add',method='true
                                             else:
                                                 raise ValueError('Invalid method')
                                         else:
-                                            simsacn=CalcSimAlt(Saccades[s1,p1,v,h],Saccades[s2,p2,v,h],Thr=Thr)
-                                            if normalize=='add':
-                                                SimSacP[s1,s2,p1,p2,v,h]=simsacn/(len(Saccades[s1,p1,v,h])+len(Saccades[s2,p2,v,h]))
-                                            elif normalize=='mult':
-                                                SimSacP[s1,s2,p1,p2,v,h]=simsacn/(len(Saccades[s1,p1,v,h])*len(Saccades[s2,p2,v,h]))
+                                            if method == 'default':  
+                                                simsacn=CalcSimAlt(Saccades[s1,p1,v,h],Saccades[s2,p1,v,h],Thr=Thr)                       
+                                                if normalize=='add':
+                                                    SimSacP[s1,s2,p1,v,h]=simsacn/(len(Saccades[s1,p1,v,h])+len(Saccades[s2,p1,v,h]))
+                                                elif normalize=='mult':
+                                                    SimSacP[s1,s2,p1,v,h]=simsacn/(len(Saccades[s1,p1,v,h])*len(Saccades[s2,p1,v,h]))
+                                            elif method == 'cosine':
+                                                SimSacP[s1,s2,p1,v,h]=CosineSim(Saccades[s1,p1,v,h],Saccades[s2,p1,v,h], Thr=Thr)
      
     return SimSacP
 
@@ -507,11 +508,14 @@ def ScanpathSimSubj2Groups(self, stim, betwcond, subjects, nHor=5, nVer=0, infer
                                 else:
                                     raise ValueError('Invalid method')
                             else:
-                                simsacn = CalcSimAlt(Saccades[s1, v, h], Saccades[s2, v, h], Thr=Thr)
-                                if normalize == 'add':
-                                    val = simsacn / (len(Saccades[s1, v, h]) + len(Saccades[s2, v, h]))
-                                elif normalize == 'mult':
-                                    val = simsacn / (len(Saccades[s1, v, h]) * len(Saccades[s2, v, h]))
+                                if method == 'default':
+                                    simsacn = CalcSimAlt(Saccades[s1, v, h], Saccades[s2, v, h], Thr=Thr)
+                                    if normalize == 'add':
+                                        val = simsacn / (len(Saccades[s1, v, h]) + len(Saccades[s2, v, h]))
+                                    elif normalize == 'mult':
+                                        val = simsacn / (len(Saccades[s1, v, h]) * len(Saccades[s2, v, h]))
+                                elif method == 'cosine':
+                                    val = CosineSim(Saccades[s1, v, h], Saccades[s2, v, h], Thr=Thr)
                             tot_val.append(val)
                     if len(tot_val) > 0:
                         SimVals[s1_idx][group].append(np.nanmean(tot_val))
@@ -566,11 +570,14 @@ def SacSimSubj2Group(self, Saccades, WhichCN, subjects, Thr=0, normalize='add', 
                                 else:
                                     raise ValueError('Invalid method')
                             else:
-                                simsacn = CalcSimAlt(Saccades[s1, v, h], Saccades[s2, v, h], Thr=Thr)
-                                if normalize == 'add':
-                                    val = simsacn / (len(Saccades[s1, v, h]) + len(Saccades[s2, v, h]))
-                                elif normalize == 'mult':
-                                    val = simsacn / (len(Saccades[s1, v, h]) * len(Saccades[s2, v, h]))
+                                if method == 'default':
+                                    simsacn = CalcSimAlt(Saccades[s1, v, h], Saccades[s2, v, h], Thr=Thr)
+                                    if normalize == 'add':
+                                        val = simsacn / (len(Saccades[s1, v, h]) + len(Saccades[s2, v, h]))
+                                    elif normalize == 'mult':
+                                        val = simsacn / (len(Saccades[s1, v, h]) * len(Saccades[s2, v, h]))
+                                elif method == 'cosine':
+                                    val = CosineSim(Saccades[s1, v, h], Saccades[s2, v, h], Thr=Thr)
                             if SingleROI:
                                 if isinstance(SimValsROI[s1_idx][group][v][h], np.ndarray):
                                     SimValsROI[s1_idx][group][v][h] = np.append(SimValsROI[s1_idx][group][v][h], val)
@@ -585,7 +592,7 @@ def SacSimSubj2Group(self, Saccades, WhichCN, subjects, Thr=0, normalize='add', 
         return SimVals
     
 
-def SacSimSubj2GroupPlusFeature(self, stim, WhichCN, subjects, nHor=5, nVer=0, inferS=False, Thr=0, normalize='add', method='default', power=1, match=False, nosubj=[]):
+def SacSimSubj2GroupPlusFeature(self, stim, WhichCN, subjects, nHor=5, nVer=0, nHor_f=0, nVer_f=0, inferS=False, Thr=0, normalize='add', method='default', power=1, match=False, nosubj=[]):
     if not hasattr(self, 'subjects'):
         self.GetParams()
     if nVer == 0:
@@ -615,13 +622,6 @@ def SacSimSubj2GroupPlusFeature(self, stim, WhichCN, subjects, nHor=5, nVer=0, i
 
         ns = self.ns  
 
-        # Also, we will accumulate the corresponding lengths per cell
-        TotAOICrossing = np.empty((ns, nVer, nHor), dtype=object)
-        for s in range(ns):
-            for v in range(nVer):
-                for h in range(nHor):
-                    TotAOICrossing[s, v, h] = []
-
         Saccades = np.zeros(((ns, nVer, nHor)), dtype=np.ndarray)  # Array of saccades crossing each AOI rectangle for each trial and participant
         for s in np.arange(self.ns):
             SaccadeAOIAngles.append(np.zeros((int(self.nsac[s, stim]), nVer, nHor)))
@@ -636,7 +636,8 @@ def SacSimSubj2GroupPlusFeature(self, stim, WhichCN, subjects, nHor=5, nVer=0, i
                     for v in range(nVer):
                         if AOIRects[stim][h][v].Cross(SaccadeDots):
                             SaccadeAOIAngles[s][sac, v, h] = SaccadeObj[s][stim][sac].Angle()  # Get angle of the saccade
-                        
+                                            
+
                 # Select saccades that cross multiple cells
                 if np.sum(SaccadeAOIAngles[s][sac, :, :] > 0) > 1:
                     SaccadeAOIAnglesCross[s][sac, :, :] = SaccadeAOIAngles[s][sac, :, :]
@@ -655,8 +656,6 @@ def SacSimSubj2GroupPlusFeature(self, stim, WhichCN, subjects, nHor=5, nVer=0, i
             for h in range(nHor):
                 for v in range(nVer):
                     if np.sum(np.isfinite(SaccadeAOIAnglesCross[s][:,v,h]))>0:
-                        # save number of crossings saccades for each cell
-                        TotAOICrossing[s, v, h] = np.sum(np.isfinite(SaccadeAOIAnglesCross[s][:,v,h]))
                         if isinstance(Saccades[s,v,h], np.ndarray):
                             Saccades[s,v,h]=np.append(Saccades[s,v,h],SaccadeAOIAnglesCross[s][~np.isnan(SaccadeAOIAnglesCross[s][:,v,h]),v,h])
                         else:
@@ -666,8 +665,16 @@ def SacSimSubj2GroupPlusFeature(self, stim, WhichCN, subjects, nHor=5, nVer=0, i
 
         Features = np.empty((ns, nVer, nHor), dtype=object)
         for s in range(ns):
-            for v in range(nVer):
-                for h in range(nHor):
+            cords = []
+            for sac in range(len(SaccadeObj[s][stim])):
+                x1,y1,x2,y2 = SaccadeObj[s][stim][sac].Coords()
+                if cords == []:
+                    cords.append((x1,y1))
+                else:
+                    cords.append((x1,y1))
+            cords.append((x2,y2))
+            for h in range(nVer):
+                for v in range(nHor):
                     angles = np.array(Saccades[s, v, h])
                     
                     # Mean and STD for angles (if there is any data)
@@ -678,22 +685,50 @@ def SacSimSubj2GroupPlusFeature(self, stim, WhichCN, subjects, nHor=5, nVer=0, i
                         mean_angle = np.nan
                         std_angle = np.nan
 
-                    # Count of fixations/saccades that touched the cell
-                    fixation_count = angles.size
+                    #Count of fixations in the cell
+                    landing_first_fix = [np.nan, np.nan]
+                    fixation_count = 0
+                    duration = np.array([])
+                    for x,y in cords:
+                        if AOIRects[stim][h][v].Contains(x,y):
+                            if fixation_count == 0:
+                                landing_first_fix = [x,y]
+                            fixation_count += 1
+                            # self.data[['subjectID','duration','mean_x','mean_y']]
+                            # check fixation duration where subjectID = DyslexiaDat.subjects[s] and mean_x, mean_y are within the AOI
+                            duration = np.append(duration, self.data.loc[(self.data['subjectID'] == self.subjects[s]) & (self.data['mean_x'] == x) & (self.data['mean_y'] == y)]['duration'].values)
 
-                    # Count of saccades that crossed multiple cells
-                    cross_angles = TotAOICrossing[s, v, h]
+                    # Number of revisits – incoming saccades hitting this ROI from outside
+                    revisits = 0
+                    exits = False
+                    for sac in range(len(SaccadeObj[s][stim])):
+                        x1,y1,x2,y2 = SaccadeObj[s][stim][sac].Coords()
+                        if AOIRects[stim][h][v].Contains(x1,y1) and not AOIRects[stim][h][v].Contains(x2,y2):
+                            exits = True
+                        if not AOIRects[stim][h][v].Contains(x1,y1) and AOIRects[stim][h][v].Contains(x2,y2) and exits:
+                            revisits += 1
 
                     Features[s, v, h] = {'mean_angle': mean_angle,
-                                         'std_angle': std_angle,
-                                         'fixation_count': fixation_count,
-                                         'cross_angles': cross_angles
-                                         }
+                                            'std_angle': std_angle,
+                                            'fixation_count': fixation_count,
+                                            'mean_fixation_duration': np.nanmean(duration),
+                                            'number_of_revisits': revisits,
+                                            'landing_first_coord':  (landing_first_fix[0] + landing_first_fix[1]) * (landing_first_fix[0] + landing_first_fix[1] + 1) / 2 + landing_first_fix[1] # Normalize and Interleave (Cantor Pairing Function)
+                                            }
                     
         return Saccades, Features
     
+    if nHor_f == 0:
+        nHor_f = nHor
+
+    if nVer_f == 0:
+        nVer_f = nHor_f
+    
     SaccadeObj = self.GetSaccades()
-    Saccades, Features = SaccadeAndFeatures(self, SaccadeObj, nHor=nHor, stim=stim, nVer=nVer, InferS=inferS)
+    Saccades, Features = SaccadeAndFeatures(self, SaccadeObj, nHor=nHor_f, stim=stim, nVer=nVer_f, InferS=inferS)
+
+    if not (nHor_f == nHor and nVer_f == nVer):
+        Saccades = self.SaccadeSingleSel(SaccadeObj, nHor=nHor, stim=stim, nVer=nVer, InferS=inferS)
     
     # Get unique conditions
     condition = np.unique(WhichCN)
@@ -731,36 +766,66 @@ def SacSimSubj2GroupPlusFeature(self, stim, WhichCN, subjects, nHor=5, nVer=0, i
                                 else:
                                     raise ValueError('Invalid method')
                             else:
-                                print()
-                                simsacn = CalcSimAlt(Saccades[s1, v, h], Saccades[s2, v, h], Thr=Thr)
-                                if normalize == 'add':
-                                    val = simsacn / (len(Saccades[s1, v, h]) + len(Saccades[s2, v, h]))
-                                elif normalize == 'mult':
-                                    val = simsacn / (len(Saccades[s1, v, h]) * len(Saccades[s2, v, h]))
+                                if method == 'default':
+                                    simsacn = CalcSimAlt(Saccades[s1, v, h], Saccades[s2, v, h], Thr=Thr)
+                                    if normalize == 'add':
+                                        val = simsacn / (len(Saccades[s1, v, h]) + len(Saccades[s2, v, h]))
+                                    elif normalize == 'mult':
+                                        val = simsacn / (len(Saccades[s1, v, h]) * len(Saccades[s2, v, h]))
+                                elif method == 'cosine':
+                                    val = CosineSim(Saccades[s1, v, h], Saccades[s2, v, h], Thr=Thr)
                             if isinstance(SimValsROI[s1_idx][group][v][h], np.ndarray):
                                 SimValsROI[s1_idx][group][v][h] = np.append(SimValsROI[s1_idx][group][v][h], val)
                             else:
                                 SimValsROI[s1_idx][group][v][h] = np.array([val])
                             tot_val.append(val)
-                SimVals[s1_idx][group].append(np.nanmean(tot_val))
+                if len(tot_val) > 0:
+                    SimVals[s1_idx][group].append(np.nanmean(tot_val))
 
-    SimAndFeatureVals = np.empty((len(subjects), nVer, nHor), dtype=object)
-    for s1_idx, s1 in enumerate(subjects):
-        for v in range(nVer):
-            for h in range(nHor):
-                feature_val = Features[s1, v, h]
-                mean_g0 = np.nanmean(SimValsROI[s1_idx][0][v][h])
-                std_g0 = np.nanstd(SimValsROI[s1_idx][0][v][h])
-                mean_g1 = np.nanmean(SimValsROI[s1_idx][1][v][h])
-                std_g1 = np.nanstd(SimValsROI[s1_idx][1][v][h])
-                SimAndFeatureVals[s1_idx][v][h] = [feature_val['fixation_count'],
-                                                   feature_val['mean_angle'] if not np.isnan(feature_val['mean_angle']) else 0, 
-                                                   feature_val['std_angle'] if not np.isnan(feature_val['std_angle']) else 0,
-                                                   feature_val['cross_angles'] if not feature_val['cross_angles'] == [] else 0,
-                                                   mean_g0 if not np.isnan(mean_g0) else 0,
-                                                   mean_g1 if not np.isnan(mean_g1) else 0,
-                                                   std_g0 if not np.isnan(std_g0) else 0,
-                                                   std_g1 if not np.isnan(std_g1) else 0
-                                                   ]
-
-    return SimAndFeatureVals
+    if nHor_f == nHor and nVer_f == nVer:
+        SimAndFeatureVals = np.empty((len(subjects), nVer, nHor), dtype=object)
+        for s1_idx, s1 in enumerate(subjects):
+            for v in range(nVer):
+                for h in range(nHor):
+                    feature_val = Features[s1, v, h]
+                    mean_g0 = np.nanmean(SimValsROI[s1_idx][0][v][h])
+                    std_g0 = np.nanstd(SimValsROI[s1_idx][0][v][h])
+                    mean_g1 = np.nanmean(SimValsROI[s1_idx][1][v][h])
+                    std_g1 = np.nanstd(SimValsROI[s1_idx][1][v][h])
+                    SimAndFeatureVals[s1_idx][v][h] = [feature_val['fixation_count'] if not np.isnan(feature_val['fixation_count']) else 0,
+                                                        feature_val['mean_fixation_duration'] if not np.isnan(feature_val['mean_fixation_duration']) else 0,
+                                                        feature_val['number_of_revisits'],
+                                                        feature_val['landing_first_coord'] if not np.isnan(feature_val['landing_first_coord']) else -1,
+                                                        mean_g0 if not np.isnan(mean_g0) else 0,
+                                                        mean_g1 if not np.isnan(mean_g1) else 0,
+                                                        std_g0 if not np.isnan(std_g0) else 0,
+                                                        std_g1 if not np.isnan(std_g1) else 0
+                                                    ]
+        return SimAndFeatureVals
+    else:
+        FeatureVals = np.empty((len(subjects), nVer_f, nHor_f), dtype=object)
+        for s1_idx, s1 in enumerate(subjects):
+            for v in range(nVer_f):
+                for h in range(nHor_f):
+                    feature_val = Features[s1, v, h]
+                    FeatureVals[s1_idx][v][h] = [feature_val['fixation_count'] if not np.isnan(feature_val['fixation_count']) else 0,
+                                                        feature_val['mean_fixation_duration'] if not np.isnan(feature_val['mean_fixation_duration']) else 0,
+                                                        feature_val['number_of_revisits'],
+                                                        feature_val['landing_first_coord'] if not np.isnan(feature_val['landing_first_coord']) else -1
+                                                        ]
+        
+        SimsVals = np.empty((len(subjects), nVer, nHor), dtype=object)
+        for s1_idx, s1 in enumerate(subjects):
+            for v in range(nVer):
+                for h in range(nHor):
+                    mean_g0 = np.nanmean(SimValsROI[s1_idx][0][v][h])
+                    std_g0 = np.nanstd(SimValsROI[s1_idx][0][v][h])
+                    mean_g1 = np.nanmean(SimValsROI[s1_idx][1][v][h])
+                    std_g1 = np.nanstd(SimValsROI[s1_idx][1][v][h])
+                    SimsVals[s1_idx][v][h] = [mean_g0 if not np.isnan(mean_g0) else 0,
+                                                mean_g1 if not np.isnan(mean_g1) else 0,
+                                                std_g0 if not np.isnan(std_g0) else 0,
+                                                std_g1 if not np.isnan(std_g1) else 0
+                                            ]
+        
+        return FeatureVals, SimsVals

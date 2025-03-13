@@ -4,6 +4,7 @@ from numpy import mat, matlib
 #from scipy import stats,ndimage
 #import pandas as pd
 import matplotlib.pyplot as plt
+from scipy.spatial.distance import cosine
 
 
 
@@ -66,15 +67,15 @@ class Rect:
         plt.plot([self.x1,self.x2],[self.y2,self.y2],alpha=alp,color=Col)
         
     def Contains(self,x,y):
-        if x>self.x1 and x<self.x2 and y > self.y1 and y < self.y2:              
+        if x>=self.x1 and x<self.x2 and y>=self.y1 and y<self.y2:              
             return True
         else:
             return False
         
     def Cross(self,LinePoints):
-        CrossXidx=np.nonzero((LinePoints[0]>self.x1)&(LinePoints[0]<self.x2))
+        CrossXidx=np.nonzero((LinePoints[0]>=self.x1)&(LinePoints[0]<self.x2))
         if len(CrossXidx)>0:
-            if any(LinePoints[1][CrossXidx]>self.y1)==True and any(LinePoints[1][CrossXidx]<self.y2)==True:
+            if any(LinePoints[1][CrossXidx]>=self.y1)==True and any(LinePoints[1][CrossXidx]<self.y2)==True:
                 return True
             else:
                 return False
@@ -229,3 +230,16 @@ def angle_difference_peak180(saccades1, saccades2, power=1, match=False):
         similarity_score = np.mean(symmetric_diffs**power)
     
     return similarity_score
+
+
+def CosineSim(saccades1,saccades2,Thr):
+   
+    bin_edges = np.linspace(0, 360, int(360/Thr)+1)  # 36 bins of 10° each + endpoint
+    
+    # Compute histograms (normalize to get probability distributions)
+    hist1, _ = np.histogram(saccades1, bins=bin_edges, density=True)
+    hist2, _ = np.histogram(saccades2, bins=bin_edges, density=True)
+        
+    # Compute cosine similarity
+    return  1 - cosine(hist1, hist2)
+    

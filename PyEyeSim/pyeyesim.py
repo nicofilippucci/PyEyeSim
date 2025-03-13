@@ -1558,7 +1558,7 @@ class Rect:
         plt.plot([self.x1,self.x2],[self.y2,self.y2],alpha=alp,color=Col)
         
      def Contains(self,x,y):
-        if x>self.x1 and x<self.x2 and y > self.y1 and y < self.y2:              
+        if x>=self.x1 and x<self.x2 and y>=self.y1 and y<self.y2:        
             return True
         else:
             return False
