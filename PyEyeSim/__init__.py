@@ -52,7 +52,7 @@ class EyeData:
         GetCats,
         GetSaccades,
         GetEntropies,
-        InferSize,
+        GetSize,
         Heatmap,
         FixCountCalc,
         GetStimSubjMap,
@@ -310,6 +310,7 @@ class EyeData:
         infersubpath=False,
         Visual=False,
         sizecorrect=True,
+        infersize=False
     ):
         """
         Description: Provide information about amount of stimuli and subjects.
@@ -347,7 +348,7 @@ class EyeData:
         self.setStimuliPath(StimPath, StimExt, infersubpath, sizecorrect=sizecorrect)
 
         print("run descriptive analysis")
-        self.RunDescriptiveFix(Visual=Visual)
+        self.RunDescriptiveFix(Visual=Visual,infersize=infersize)
         pass
     def SaccadeDataInfo(
         self,
@@ -404,7 +405,7 @@ class EyeData:
     
 
 
-    def RunDescriptiveFix(self, Visual=0, duration=0):
+    def RunDescriptiveFix(self, Visual=0, duration=0,infersize=False,Interval=99):
         """
         Description:  Calculate descriptive statistics for fixation data in dataset.
 
@@ -423,7 +424,9 @@ class EyeData:
             len(self.stimuli),
             " stimuli.",
         )
-        self.boundsX, self.boundsY = self.InferSize(Interval=99)
+        
+        
+        self.boundsX, self.boundsY = self.GetSize(infersize=infersize,Interval=Interval)
         self.actsize = (self.boundsX[:, 1] - self.boundsX[:, 0]) * (
             self.boundsY[:, 1] - self.boundsY[:, 0]
         )
