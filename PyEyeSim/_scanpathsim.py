@@ -101,7 +101,7 @@ def AOIFix(self,p,FixTrialX,FixTrialY,nDivH,nDivV,InferS=1):
 #     return Saccades
 
 
-def SaccadeSel(self,nHor,nVer=0,minL=0): 
+def SaccadeSel(self,SaccadeObj,nHor,nVer=0,minL=0): 
     '''
     select saccades for angle comparison method, return array of saccade angles for each participant, stimulus and cell for a given hor by ver division
     
@@ -123,6 +123,8 @@ def SaccadeSel(self,nHor,nVer=0,minL=0):
     if nVer==0:
         nVer=nHor  # if number of vertical divisions not provided -- use same as the number of horizontal
     
+    SaccadeAOIAngles=[]
+    SaccadeAOIAnglesCross=[]
     AOIRects=CreatAoiRects(nHor,nVer,self.boundsX,self.boundsY)
 
     Saccades=np.zeros((((self.ns,self.np,nVer,nHor))),dtype=np.ndarray)  # store an array of saccades that cross the cell, for each AOI rectangle of each trial for each partiicpant

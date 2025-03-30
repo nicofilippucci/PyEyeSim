@@ -9,7 +9,6 @@ from .scanpathshelpdebug import CreatAoiRects,SaccadeLine
 import platform
 import warnings
 
-
 def GetParams(self):
     """ Get stimulus and subject info of dataset """  
     if 'subjectID' not in self.data.columns:
@@ -72,6 +71,29 @@ def GetSize(self,infersize=False,Interval=99):
 
     BoundsX=np.intp(np.round(BoundsX))
     BoundsY=np.intp(np.round(BoundsY))
+    return BoundsX,BoundsY
+
+def InferSize(self,Interval=99):
+    ''' Infer stimulus size as central Interval % fixations data'''
+    BoundsX=np.zeros((len(self.stimuli),2))
+    BoundsY=np.zeros((len(self.stimuli),2))
+    for cp,p in enumerate(self.stimuli):
+        Idx=np.nonzero(self.data['Stimulus'].to_numpy()==p)[0]
+        BoundsX[cp,:]=np.percentile(self.data['mean_x'].to_numpy()[Idx],[(100-Interval)/2,Interval+(100-Interval)/2])
+        BoundsY[cp,:]=np.percentile(self.data['mean_y'].to_numpy()[Idx],[(100-Interval)/2,Interval+(100-Interval)/2])
+        
+        if BoundsX[cp,0]<0:  
+            BoundsX[cp,0]=0. ## out of area bounds are replaced with screen size
+        if BoundsY[cp,0]<0:
+            BoundsY[cp,0]=0  ## out of area bounds are replaced with screen size
+        if BoundsX[cp,1]>self.x_size:
+            BoundsX[cp,1]=self.x_size  ## out of area bounds are replaced with screen size
+        if BoundsY[cp,1]>self.y_size:
+            BoundsY[cp,1]=self.y_size  ## out of area bounds are replaced with screen size
+    BoundsX=np.intp(np.round(BoundsX))
+    BoundsY=np.intp(np.round(BoundsY))
+    #self.boundsX=BoundsX
+    #self.boundsY=BoundsY
     return BoundsX,BoundsY
 
 def GetStimuli(self,extension,path=0,infersubpath=False,sizecorrect=True):
@@ -306,42 +328,38 @@ def GetStimSubjMap(self,Stims):
 
 
 def GetSaccades(self):
-    ''' from fixations, make approximate saccades'''
+    ''' from fixations, make approximate saccades, and store it as saccade objects'''
+    SaccadeObj=[]
     
     self.nsac=np.zeros((self.ns,self.np))
-    self.saccadelengths=np.zeros((self.ns,self.np),dtype=object)
+    self.saccadelenghts=np.zeros((self.ns,self.np))
     self.saccadeangles=np.zeros((self.ns,self.np),dtype=object) 
     
-    self.startX=np.zeros((self.ns,self.np),dtype=object)
-    self.startY=np.zeros((self.ns,self.np),dtype=object)  
-    self.endX=np.zeros((self.ns,self.np),dtype=object) 
-    self.endY=np.zeros((self.ns,self.np),dtype=object)
     for cs,s in enumerate(self.subjects):
+            SaccadeObj.append([])        
             for cp,p in enumerate(self.stimuli):
-      
+                SaccadeObj[cs].append([])
                 if self.saccadedat==True: ##  if already in saccade format
                     StartTrialX,StartTrialY,EndTrialX,EndTrialY=self.GetSaccadeData(s,p)
                 else: # if transformed from fixation format
                     FixTrialX,FixTrialY=self.GetFixationData(s,p)
                     StartTrialX,StartTrialY,EndTrialX,EndTrialY=SaccadesTrial(FixTrialX,FixTrialY)
-                self.nsac[cs,cp]=len(StartTrialX)
-                if len(StartTrialX)>0:
-                    self.startX[cs,cp]=StartTrialX
-                    self.startY[cs,cp]=StartTrialY
-                    self.endX[cs,cp]=EndTrialX
-                    self.endY[cs,cp]=EndTrialY
-                    self.saccadelengths[cs,cp]=np.sqrt((EndTrialX-StartTrialX)**2+(EndTrialY-StartTrialY)**2)                    
-                    self.saccadeangles[cs,cp]=calculate_angle(StartTrialX,StartTrialY,EndTrialX,EndTrialY)
-                    
+                SaccadesSubj=np.column_stack((StartTrialX,StartTrialY,EndTrialX,EndTrialY)) 
+                csac=0
+                
+                self.saccadeangles[cs,cp]=calculate_angle(StartTrialX,StartTrialY,EndTrialX,EndTrialY)
+                for sac in range(len(StartTrialX)):
+                    if np.isfinite(SaccadesSubj[sac,0])==True:
+                        SaccadeObj[cs][cp].append(SaccadeLine(SaccadesSubj[sac,:]))  # store saccades as list of  objects 
+                        self.saccadelenghts[cs,cp]+=SaccadeObj[cs][cp][-1].length()   
+                        csac+=1
+                self.nsac[cs,cp]=csac  # num of saccades for each participant and painting
+                if csac>0:
+                    self.saccadelenghts[cs,cp]/=csac
+            
                 else:
-                    self.saccadeangles[cs,cp]=np.NAN
-                    self.saccadelengths[cs,cp]=np.NAN
-                    self.startX[cs,cp]=np.NAN
-                    self.startY[cs,cp]=np.NAN
-                    self.endX[cs,cp]=np.NAN
-                    self.endY[cs,cp]=np.NAN
-
-    return 
+                    self.saccadelenghts[cs,cp]=np.nan
+    return SaccadeObj
 
 
 
