@@ -448,7 +448,7 @@ def calculate_starting_likelihood(self, X, Y, list_lengths, n_components_list, c
         else:
             for i, model in enumerate(models):
                 if bic_scores[i] < best_score[i]:
-                    new_models[i] = copy.deepcopy(models)
+                    new_models[i] = copy.deepcopy(models[i])
                     best_score[i] = bic_scores[i]
 
     # Convert lists to arrays for easier manipulation

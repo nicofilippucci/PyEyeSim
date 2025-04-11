@@ -872,6 +872,7 @@ def SacSimSubj2GroupPlusFeature(self, stim, WhichCN, subjects, nHor=5, nVer=0, n
                                                         std_g1 if not np.isnan(std_g1) else 0
                                                     ]
         return SimAndFeatureVals
+    
     else:
         FeatureVals = np.empty((len(subjects), nVer_f, nHor_f), dtype=object)
         for s1_idx, s1 in enumerate(subjects):
