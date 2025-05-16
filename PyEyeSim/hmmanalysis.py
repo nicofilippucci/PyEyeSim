@@ -97,7 +97,7 @@ def get_data(self, stim, group=-1, tolerance=20, subject=-1, remove_subj=False):
         The list of fixation lengths for each subject.
     """
 
-    XX, YY, list_lengths,_ = self.DataArrayHmm(stim, group, tolerance=tolerance, verb=False)
+    XX,YY,list_lengths,missing_subj = self.DataArrayHmm(stim, group, tolerance=tolerance, verb=False)
     if subject != -1:
         if isinstance(subject, int):
             subject = [subject]
@@ -106,6 +106,11 @@ def get_data(self, stim, group=-1, tolerance=20, subject=-1, remove_subj=False):
         final_list_lengths = np.array([], dtype=int)
         lengths_sum = np.cumsum(list_lengths)
         for s in subject:
+            new_s = s
+            for missing in missing_subj:
+                if s >= missing:
+                    new_s -= 1
+            s = new_s
             try:
                 l = list_lengths[s]
                 if s == 0:
