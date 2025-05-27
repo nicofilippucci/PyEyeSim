@@ -1,6 +1,6 @@
 [
     {
-        "description": "Models trained with data of Combined Reading and Spelling Deficit and Isolated Reading Deficit (2rd Fold)"
+        "description": "Models trained with data from Munich of Combined Reading and Spelling Deficit and Isolated Reading Deficit (2rd Fold)"
     },
     {
         "num_stimuli": 30

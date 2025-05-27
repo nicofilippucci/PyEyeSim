@@ -1,6 +1,6 @@
 [
     {
-        "description": "Models trained with data of Typical Reader and Isolated Spelling Deficit (2rd Fold)"
+        "description": "Models trained with data from Munich of Typical Reader and Isolated Spelling Deficit (2rd Fold)"
     },
     {
         "num_stimuli": 30
