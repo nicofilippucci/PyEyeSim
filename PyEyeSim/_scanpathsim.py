@@ -6,7 +6,7 @@ Created on Thu Jan 25 17:54:38 2024
 """
 
 from math import e
-from re import S
+from re import A, S
 import numpy as np
 from numpy import cross, matlib, std
 from scipy import stats,ndimage
@@ -266,7 +266,6 @@ def SacSim1Group(self,Saccades,Thr=5,p='all',normalize='add',method='default',po
                         for h in range(nHor):
                             for v in range(nVer):
                                 if len(Saccades[s1,p1,v,h])>0 and len(Saccades[s2,p1,v,h])>0:
-                                    
                                     if Thr==0:
                                         if method == 'peak180':
                                             SimSacP[s1,s2,p1,v,h]=angle_difference_peak180(Saccades[s1,p1,v,h],Saccades[s2,p1,v,h],power=power, match=match)
@@ -662,7 +661,77 @@ def SacSimSubj2Group(self, Saccades, WhichCN, subjects, Thr=0, normalize='add', 
         return SimVals
     
 
-def SacSimSubj2GroupPlusFeature(self, stim, WhichCN, subjects, nHor=5, nVer=0, nHor_f=0, nVer_f=0, inferS=False, Thr=0, normalize='add', method='default', power=1, match=False, nosubj=[]):
+def FeatureExtraction(self, SaccadeObj, Saccades, nHor, stim, nVer=0, InferS=False, AOIRects=None):
+    if nVer == 0:
+            nVer = nHor  # if number of vertical divisions not provided, use same as horizontal
+            Features = np.empty((self.ns, nVer, nHor), dtype=object)
+    else:
+        Features = np.empty((self.ns, nVer, nHor), dtype=object)
+    
+    if AOIRects is None:
+        if InferS:
+            if not hasattr(self, 'boundsX'):
+                print('Running descriptives to get bounds')
+                self.RunDescriptiveFix()  
+            AOIRects = CreatAoiRects(nHor, nVer, self.boundsX, self.boundsY)
+        else:
+            AOIRects = CreatAoiRects(nHor, nVer, self.x_size, self.y_size, allsame=self.np)
+
+    for s in range(self.ns):
+        cords = []
+        for sac in range(len(SaccadeObj[s][stim])):
+            x1,y1,x2,y2 = SaccadeObj[s][stim][sac].Coords()
+            if cords == []:
+                cords.append((x1,y1))
+            else:
+                cords.append((x1,y1))
+        cords.append((x2,y2))
+        for h in range(nVer):
+            for v in range(nHor):
+                angles = np.array(Saccades[s, v, h])
+                
+                # Mean and STD for angles (if there is any data)
+                if angles.size > 0:
+                    mean_angle = np.nanmean(angles)
+                    std_angle = np.nanstd(angles)
+                else:
+                    mean_angle = np.nan
+                    std_angle = np.nan
+
+                #Count of fixations in the cell
+                landing_first_fix = [np.nan, np.nan]
+                fixation_count = 0
+                duration = np.array([])
+                for x,y in cords:
+                    if AOIRects[stim][h][v].Contains(x,y):
+                        if fixation_count == 0:
+                            landing_first_fix = [x,y]
+                        fixation_count += 1
+                        # self.data[['subjectID','duration','mean_x','mean_y']]
+                        # check fixation duration where subjectID = DyslexiaDat.subjects[s] and mean_x, mean_y are within the AOI
+                        duration = np.append(duration, self.data.loc[(self.data['subjectID'] == self.subjects[s]) & (self.data['mean_x'] == x) & (self.data['mean_y'] == y)]['duration'].values)
+
+                # Number of revisits – incoming saccades hitting this ROI from outside
+                revisits = 0
+                exits = False
+                for sac in range(len(SaccadeObj[s][stim])):
+                    x1,y1,x2,y2 = SaccadeObj[s][stim][sac].Coords()
+                    if AOIRects[stim][h][v].Contains(x1,y1) and not AOIRects[stim][h][v].Contains(x2,y2):
+                        exits = True
+                    if not AOIRects[stim][h][v].Contains(x1,y1) and AOIRects[stim][h][v].Contains(x2,y2) and exits:
+                        revisits += 1
+
+                Features[s, v, h] = {'mean_angle': mean_angle,
+                                        'std_angle': std_angle,
+                                        'fixation_count': fixation_count,
+                                        'mean_fixation_duration': np.nanmean(duration),
+                                        'number_of_revisits': revisits,
+                                        'landing_first_coord':  (landing_first_fix[0] + landing_first_fix[1]) * (landing_first_fix[0] + landing_first_fix[1] + 1) / 2 + landing_first_fix[1] # Normalize and Interleave (Cantor Pairing Function)
+                                        }
+    return Features
+    
+
+def SacSimSubj2GroupPlusFeature(self, stim, WhichCN, subjects, nHor=5, nVer=0, nHor_f=0, nVer_f=0, inferS=False, Thr=0, normalize='add', method='default', power=1, match=False, nosubj=[], SaccadeObj=None, Saccades=None, Features=None, SimMatrix=None):
     if not hasattr(self, 'subjects'):
         self.GetParams()
     if nVer == 0:
@@ -794,11 +863,13 @@ def SacSimSubj2GroupPlusFeature(self, stim, WhichCN, subjects, nHor=5, nVer=0, n
     if nVer_f == 0:
         nVer_f = nHor_f
     
-    SaccadeObj = self.GetSaccades()
-    Saccades, Features = SaccadeAndFeatures(self, SaccadeObj, nHor=nHor_f, stim=stim, nVer=nVer_f, InferS=inferS)
+    if SaccadeObj is None:
+        SaccadeObj = self.GetSaccades()
+    if Saccades is None and Features is None:
+        Saccades, Features = SaccadeAndFeatures(self, SaccadeObj, nHor=nHor_f, stim=stim, nVer=nVer_f, InferS=inferS)
 
-    if not (nHor_f == nHor and nVer_f == nVer):
-        Saccades = self.SaccadeSingleSel(SaccadeObj, nHor=nHor, stim=stim, nVer=nVer, InferS=inferS)
+        if not (nHor_f == nHor and nVer_f == nVer):
+            Saccades = self.SaccadeSingleSel(SaccadeObj, nHor=nHor, stim=stim, nVer=nVer, InferS=inferS)
     
     # Get unique conditions
     condition = np.unique(WhichCN)
@@ -818,39 +889,61 @@ def SacSimSubj2GroupPlusFeature(self, stim, WhichCN, subjects, nHor=5, nVer=0, n
         s = subjects
         
     # Calculate similarity between subjects of different groups and the selected subject
-    for s1_idx, s1 in enumerate(subjects):
-        for s2 in range(self.ns):
-            if s1 != s2 and s2 not in s:
-                tot_val = []
-                for h in range(nHor):
-                    for v in range(nVer):
-                        if len(Saccades[s1, v, h]) > 0 and len(Saccades[s2, v, h]) > 0:
-                            group = WhichCN[s2]
-                            if Thr == 0:
-                                if method == 'peak180':
-                                    val = angle_difference_peak180(Saccades[s1, v, h], Saccades[s2, v, h], power=power, match=match)
-                                elif method == 'power':
-                                    val = angle_difference_power(Saccades[s1, v, h], Saccades[s2, v, h], power=power)
-                                elif method == 'Kuiper':
-                                    val = KuiperStat(Saccades[s1, v, h], Saccades[s2, v, h])
+    if SimMatrix is None:
+        for s1_idx, s1 in enumerate(subjects):
+            for s2 in range(self.ns):
+                if s1 != s2 and s2 not in s:
+                    tot_val = []
+                    for h in range(nHor):
+                        for v in range(nVer):
+                            if len(Saccades[s1, v, h]) > 0 and len(Saccades[s2, v, h]) > 0:
+                                group = WhichCN[s2]
+                                if Thr == 0:
+                                    if method == 'peak180':
+                                        val = angle_difference_peak180(Saccades[s1, v, h], Saccades[s2, v, h], power=power, match=match)
+                                    elif method == 'power':
+                                        val = angle_difference_power(Saccades[s1, v, h], Saccades[s2, v, h], power=power)
+                                    elif method == 'Kuiper':
+                                        val = KuiperStat(Saccades[s1, v, h], Saccades[s2, v, h])
+                                    else:
+                                        raise ValueError('Invalid method')
                                 else:
-                                    raise ValueError('Invalid method')
-                            else:
-                                if method == 'default':
-                                    simsacn = CalcSimAlt(Saccades[s1, v, h], Saccades[s2, v, h], Thr=Thr)
-                                    if normalize == 'add':
-                                        val = simsacn / (len(Saccades[s1, v, h]) + len(Saccades[s2, v, h]))
-                                    elif normalize == 'mult':
-                                        val = simsacn / (len(Saccades[s1, v, h]) * len(Saccades[s2, v, h]))
-                                elif method == 'cosine':
-                                    val = CosineSim(Saccades[s1, v, h], Saccades[s2, v, h], Thr=Thr)
-                            if isinstance(SimValsROI[s1_idx][group][v][h], np.ndarray):
-                                SimValsROI[s1_idx][group][v][h] = np.append(SimValsROI[s1_idx][group][v][h], val)
-                            else:
-                                SimValsROI[s1_idx][group][v][h] = np.array([val])
-                            tot_val.append(val)
-                if len(tot_val) > 0:
-                    SimVals[s1_idx][group].append(np.nanmean(tot_val))
+                                    if method == 'default':
+                                        simsacn = CalcSimAlt(Saccades[s1, v, h], Saccades[s2, v, h], Thr=Thr)
+                                        if normalize == 'add':
+                                            val = simsacn / (len(Saccades[s1, v, h]) + len(Saccades[s2, v, h]))
+                                        elif normalize == 'mult':
+                                            val = simsacn / (len(Saccades[s1, v, h]) * len(Saccades[s2, v, h]))
+                                    elif method == 'cosine':
+                                        val = CosineSim(Saccades[s1, v, h], Saccades[s2, v, h], Thr=Thr)
+                                if isinstance(SimValsROI[s1_idx][group][v][h], np.ndarray):
+                                    SimValsROI[s1_idx][group][v][h] = np.append(SimValsROI[s1_idx][group][v][h], val)
+                                else:
+                                    SimValsROI[s1_idx][group][v][h] = np.array([val])
+                                tot_val.append(val)
+                    if len(tot_val) > 0:
+                        SimVals[s1_idx][group].append(np.nanmean(tot_val))
+    else:
+        if SimMatrix.shape != (self.ns, self.ns, nVer, nHor):
+            raise ValueError('SimMatrix shape does not match expected dimensions (ns, ns, nVer, nHor)')
+        # If SimMatrix is provided, we use it directly
+        for s1_idx, s1 in enumerate(subjects):
+            for s2 in range(self.ns):
+                if s1 != s2 and s2 not in s:
+                    tot_val = []
+                    for h in range(nHor):
+                        for v in range(nVer):
+                            if len(Saccades[s1, v, h]) > 0 and len(Saccades[s2, v, h]) > 0:
+                                group = WhichCN[s2]
+                                val = SimMatrix[s1, s2, v, h]
+                                if isinstance(SimValsROI[s1_idx][group][v][h], np.ndarray):
+                                    SimValsROI[s1_idx][group][v][h] = np.append(SimValsROI[s1_idx][group][v][h], val)
+                                else:
+                                    SimValsROI[s1_idx][group][v][h] = np.array([val])
+                                tot_val.append(val)
+                    if len(tot_val) > 0:
+                        SimVals[s1_idx][group].append(np.nanmean(tot_val))
+
 
     if nHor_f == nHor and nVer_f == nVer:
         SimAndFeatureVals = np.empty((len(subjects), nVer, nHor), dtype=object)
