@@ -812,8 +812,8 @@ def SacSimSubj2GroupPlusFeature(self, stim, WhichCN, subjects, nHor=5, nVer=0, n
                 else:
                     cords.append((x1,y1))
             cords.append((x2,y2))
-            for h in range(nVer):
-                for v in range(nHor):
+            for h in range(nHor):
+                for v in range(nVer):
                     angles = np.array(Saccades[s, v, h])
                     
                     # Mean and STD for angles (if there is any data)
