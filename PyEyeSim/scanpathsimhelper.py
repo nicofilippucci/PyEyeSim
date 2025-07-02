@@ -194,28 +194,32 @@ def angle_difference_peak180(saccades1, saccades2, power=1, match=False):
         float: The mean similarity score, normalized between 0 and 1.
     """
     if match:
-        # Calculate differences between saccades with a matching penalty for extras
-        matched_diffs = []
-        saccades2_used = np.zeros(len(saccades2), dtype=bool)
+        s1 = np.array(saccades1)
+        s2 = np.array(saccades2)
 
-        for angle1 in saccades1:
-            diffs = np.abs(angle1 - saccades2) % 360
-            diffs = np.minimum(diffs, 360 - diffs)  # Handle circularity
-            # Find the closest match in saccades2
-            min_diff_idx = np.argmin(diffs)
-            if not saccades2_used[min_diff_idx]:
-                saccades2_used[min_diff_idx] = True
-                matched_diffs.append(diffs[min_diff_idx])
-            else:
-                matched_diffs.append(180)  # Penalize unmatched saccades
-        
-        # Penalize remaining unmatched saccades in saccades2
-        unmatched_penalty = [180] * (len(saccades2) - np.sum(saccades2_used))
-        matched_diffs.extend(unmatched_penalty)
+        if len(s1) == 0 and len(s2) == 0:
+            similarity_score = 0.0 
+        elif len(s1) == 0 or len(s2) == 0:
+            similarity_score = 1.0
+        else:
+            if len(s1) > len(s2):
+                s1, s2 = s2, s1
 
-        normalized_diffs = np.array(matched_diffs) / 180
-        symmetric_diffs = 1 - np.abs(1 - normalized_diffs)
-        similarity_score = np.mean(symmetric_diffs**power)
+            max_shift = len(s2) - len(s1)
+            best_score = np.inf
+            for shift in range(max_shift + 1):
+                aligned_s2 = s2[shift:shift + len(s1)]
+                diffs = np.abs(s1 - aligned_s2) % 360
+                diffs = np.minimum(diffs, 360 - diffs)
+                normalized = diffs / 180  # 0 = perfect match, 1 = opposite direction
+                penalty = (len(s2) - len(s1)) / len(s2)
+                score = np.mean(normalized ** power)
+                score += penalty
+
+                if score < best_score:
+                    best_score = score
+
+            similarity_score = best_score
     else:
         diffs = np.abs(saccades1[:, np.newaxis] - saccades2) % 360
         diffs = np.minimum(diffs, 360 - diffs) 
