@@ -239,5 +239,5 @@ def CosineSim(saccades1,saccades2,Thr):
     hist2, _ = np.histogram(saccades2, bins=bin_edges, density=True)
         
     # Compute cosine similarity
-    return  1 - cosine(hist1, hist2)
+    return  cosine(hist1, hist2)
     

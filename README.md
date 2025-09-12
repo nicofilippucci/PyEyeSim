@@ -43,6 +43,7 @@ for examples of using the library, see the PyEyeSimDemo.ipynb in the Notebooks f
   scikit-image
   hmmlearn
   xarray
+  torch
 
 ##### on pip
 https://pypi.org/project/pyeyesim/
